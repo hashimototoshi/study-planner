@@ -1,47 +1,226 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>Study Planner - 1ヶ月表示版</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Study Planner – 月一覧（曜日つき・行色対応）</title>
 <style>
-  body { font-family: sans-serif; margin: 20px; }
-  table { border-collapse: collapse; width: 100%; }
-  th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
-  th { background: #f0f0f0; }
+  :root{
+    --line:#e5e7eb; --muted:#6b7280;
+    --today:#e6f0ff;      /* 本日：薄い青 */
+    --row-gray:#f3f4f6;   /* 手動：薄いグレー */
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:14px;font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",sans-serif;color:#111827;background:#fff}
+  h1{margin:0 0 12px;font-size:18px}
+  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+  .muted{color:var(--muted);font-size:12px}
+  button,select,input[type="text"]{
+    padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;font-size:16px
+  }
+  button.primary{background:#2563eb;border-color:#2563eb;color:#fff}
+  .tbl{width:100%;overflow:auto;border:1px solid var(--line);border-radius:12px}
+  table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+  th,td{padding:12px;border-bottom:1px solid var(--line);vertical-align:top;background:#fff}
+  th{text-align:left;font-weight:600;font-size:12px;color:var(--muted)}
+  td.padL{padding-left:22px} /* 列間のゆとり */
+  td.small{width:120px}
+  td.medium{width:160px}
+  tr.today:not(.gray) td{background:var(--today)} /* 本日ハイライト（灰指定時は上書きしない） */
+  tr.gray td{background:var(--row-gray)}
+  @media (max-width:820px){th,td{font-size:16px}button,select,input{font-size:16px}}
 </style>
 </head>
 <body>
-<h1>学習計画（1ヶ月表示）</h1>
-<table>
-  <thead>
-    <tr>
-      <th>日付</th>
-      <th>種別</th>
-      <th>科目</th>
-    </tr>
-  </thead>
-  <tbody id="plan-body"></tbody>
-</table>
+  <h1>学習計画（1ヶ月表示／曜日つき）</h1>
+  <div class="bar">
+    <button id="prev" class="primary">◀ 前月</button>
+    <div id="label" class="muted"></div>
+    <button id="next" class="primary">次月 ▶</button>
+    <button id="save">💾 保存</button>
+    <button id="load">📥 読込</button>
+  </div>
+
+  <div class="tbl">
+    <table>
+      <thead>
+        <tr>
+          <th class="medium">日付</th>
+          <th class="small padL">種別</th>
+          <th class="medium padL">目標（科目名）</th>
+          <th class="medium padL">結果</th>
+          <th class="medium padL">復習</th>
+          <th class="small padL">行色</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
 <script>
 (function(){
-  const today = new Date();
-  const tbody = document.getElementById('plan-body');
-  
-  // 30日分作成
-  for(let i=0; i<30; i++){
-    const d = new Date();
-    d.setDate(today.getDate() + i);
-    const y = d.getFullYear();
-    const m = d.getMonth() + 1;
-    const day = d.getDate();
-    const week = ['日','月','火','水','木','金','土'][d.getDay()];
-    
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${m}/${day}(${week})</td>
-                    <td contenteditable>学習</td>
-                    <td contenteditable>科目名</td>`;
-    tbody.appendChild(tr);
+  'use strict';
+  const KEY='studyplanner.month.form.v1';
+
+  // 月切替
+  let year, month; // 0-11
+  const now=new Date(); year=now.getFullYear(); month=now.getMonth();
+
+  // モデル：date(YYYY-MM-DD), type('学習'|'休日'|'復習'|''), goal, result, review, color('normal'|'gray')
+  let rows=[];
+
+  // ユーティリティ
+  const $=sel=>document.querySelector(sel);
+  const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const fromYmd=s=>{const [y,m,d]=s.split('-').map(Number); return new Date(y, m-1, d);};
+  const jpWeek=d=>'日月火水木金土'[d.getDay()];
+  const jpDateLabel=s=>{const d=fromYmd(s);return `${d.getMonth()+1}月${d.getDate()}日(${jpWeek(d)})`;};
+
+  // 月の日付一覧
+  function monthDates(y,m){
+    const first=new Date(y,m,1), last=new Date(y,m+1,0), arr=[];
+    for(let d=new Date(first); d<=last; d.setDate(d.getDate()+1)) arr.push(ymd(d));
+    return arr;
   }
+
+  // 今月の枠を用意（既存は温存／無い日だけ作成）
+  function ensureScaffold(){
+    const need=new Set(monthDates(year,month));
+    const have=new Set(rows.map(r=>r.date));
+    need.forEach(d=>{
+      if(!have.has(d)){
+        rows.push({date:d, type:'学習', goal:'', result:'', review:'', color:'normal'}); // デフォルト：学習／目標空
+      }
+    });
+    // 他月のレコードは一旦残しても良いが、表示は今月限定
+    rows.sort((a,b)=>a.date.localeCompare(b.date));
+  }
+
+  function save(){
+    try{
+      const key=`${KEY}:${year}-${String(month+1).padStart(2,'0')}`;
+      const data=rows.filter(r=>fromYmd(r.date).getMonth()===month && fromYmd(r.date).getFullYear()===year);
+      localStorage.setItem(key, JSON.stringify(data));
+      alert('保存しました（この端末のブラウザ内）');
+    }catch(e){}
+  }
+
+  function load(){
+    const key=`${KEY}:${year}-${String(month+1).padStart(2,'0')}`;
+    const raw=localStorage.getItem(key);
+    if(!raw) return false;
+    try{
+      const data=JSON.parse(raw)||[];
+      // 今月分をマージ（他月データは rows に残る可能性があるが表示は今月のみ）
+      const map=new Map(rows.map(r=>[r.date,r]));
+      data.forEach(d=>map.set(d.date, d));
+      rows=[...map.values()];
+      return true;
+    }catch(e){ return false; }
+  }
+
+  function render(){
+    ensureScaffold();
+    $('#label').textContent=`${year}年${month+1}月（${monthDates(year,month).length}日）`;
+
+    const tb=$('#tbody'); tb.innerHTML='';
+    const todayStr=ymd(new Date());
+
+    monthDates(year,month).forEach(date=>{
+      const r = rows.find(x=>x.date===date) || {date, type:'学習', goal:'', result:'', review:'', color:'normal'};
+      const tr=document.createElement('tr');
+
+      // 行色（today優先、ただし手動gray指定ならgray）
+      if(r.color==='gray'){ tr.classList.add('gray'); }
+      else if(date===todayStr){ tr.classList.add('today'); }
+
+      // 日付
+      const tdDate=document.createElement('td');
+      tdDate.className='medium';
+      tdDate.textContent = jpDateLabel(date);
+
+      // 種別
+      const tdType=document.createElement('td'); tdType.className='small padL';
+      const selType=document.createElement('select');
+      ['学習','休日','復習',''].forEach(opt=>{
+        const o=document.createElement('option');
+        o.value=opt; o.textContent = opt||'（未設定）';
+        if((r.type||'')===opt) o.selected=true;
+        selType.appendChild(o);
+      });
+      selType.addEventListener('change',e=>{
+        r.type=e.target.value;
+        // 休日のときは入力欄を使わない（値は保持）
+        render(); // 表示状態の更新（disabled切替）
+        persistInMemory(r);
+      });
+      tdType.appendChild(selType);
+
+      // 目標（科目名）
+      const tdGoal=document.createElement('td'); tdGoal.className='medium padL';
+      const inGoal=document.createElement('input'); inGoal.type='text'; inGoal.placeholder='例：世界史 23〜24';
+      inGoal.value=r.goal||'';
+      inGoal.disabled = (r.type==='休日');
+      inGoal.addEventListener('input',e=>{ r.goal=e.target.value; persistInMemory(r); });
+      tdGoal.appendChild(inGoal);
+
+      // 結果
+      const tdRes=document.createElement('td'); tdRes.className='medium padL';
+      const inRes=document.createElement('input'); inRes.type='text'; inRes.placeholder='実績';
+      inRes.value=r.result||'';
+      inRes.disabled = (r.type==='休日');
+      inRes.addEventListener('input',e=>{ r.result=e.target.value; persistInMemory(r); });
+      tdRes.appendChild(inRes);
+
+      // 復習
+      const tdRev=document.createElement('td'); tdRev.className='medium padL';
+      const inRev=document.createElement('input'); inRev.type='text'; inRev.placeholder='復習範囲';
+      inRev.value=r.review||'';
+      inRev.disabled = (r.type==='休日');
+      inRev.addEventListener('input',e=>{ r.review=e.target.value; persistInMemory(r); });
+      tdRev.appendChild(inRev);
+
+      // 行色（手動）
+      const tdClr=document.createElement('td'); tdClr.className='small padL';
+      const selClr=document.createElement('select');
+      [{v:'normal',t:'通常'},{v:'gray',t:'薄いグレー'}].forEach(p=>{
+        const o=document.createElement('option'); o.value=p.v; o.textContent=p.t;
+        if((r.color||'normal')===p.v) o.selected=true;
+        selClr.appendChild(o);
+      });
+      selClr.addEventListener('change',e=>{
+        r.color=e.target.value;
+        render(); // 即反映
+        persistInMemory(r);
+      });
+      tdClr.appendChild(selClr);
+
+      tr.appendChild(tdDate);
+      tr.appendChild(tdType);
+      tr.appendChild(tdGoal);
+      tr.appendChild(tdRes);
+      tr.appendChild(tdRev);
+      tr.appendChild(tdClr);
+
+      tb.appendChild(tr);
+    });
+  }
+
+  // rows配列内の該当レコードを更新
+  function persistInMemory(rec){
+    const i = rows.findIndex(x=>x.date===rec.date);
+    if(i>=0) rows[i]=rec; else rows.push(rec);
+    // 保存は明示ボタンで。こまめに保存したいならここで localStorage してもOK。
+  }
+
+  // イベント
+  $('#prev').addEventListener('click',()=>{ month-=1; if(month<0){month=11;year-=1;} load(); render(); });
+  $('#next').addEventListener('click',()=>{ month+=1; if(month>11){month=0;year+=1;} load(); render(); });
+  $('#save').addEventListener('click',save);
+  $('#load').addEventListener('click',()=>{ const ok=load(); render(); alert(ok?'読み込みました':'保存データが見つかりません'); });
+
+  // 初期描画
+  load(); render();
 })();
 </script>
 </body>
