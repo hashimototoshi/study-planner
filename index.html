@@ -10,8 +10,10 @@
     --muted:#6b7280;
     --today-bg:#005A9C;      /* 本日 背景：ドジャースブルー */
     --today-text:#ffffff;    /* 本日 文字色：白 */
-    --row-gray-bg:#b0a89f;   /* 手動 背景：ジャンガリアンハムスター色 */
+    --row-gray-bg:#b0a89f;   /* 手動 背景：ジャンガリアン色 */
     --row-gray-text:#000000; /* 手動 文字色：黒 */
+    --header-bg:#ffffff;
+    --header-shadow: 0 6px 12px rgba(0,0,0,0.06); /* ほんのり影 */
   }
   *{box-sizing:border-box}
   body{
@@ -26,22 +28,39 @@
     padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;font-size:16px
   }
   button.primary{background:#2563eb;border-color:#2563eb;color:#fff}
-  .tbl{width:100%;overflow:auto;border:1px solid var(--line);border-radius:12px}
+
+  /* テーブル */
+  .tbl{
+    width:100%;
+    border:1px solid var(--line);
+    border-radius:12px;
+    overflow:auto;
+    max-height:70vh; /* 表内スクロールにしてヘッダーをstickyに */
+  }
   table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
   th,td{padding:12px;border-bottom:1px solid var(--line);vertical-align:top;background:#fff}
-  th{text-align:left;font-weight:600;font-size:12px;color:var(--muted)}
+  th{
+    text-align:left;font-weight:600;font-size:12px;color:var(--muted);
+    position:sticky; top:0; z-index:3;
+    background:var(--header-bg);
+    border-bottom:2px solid var(--line);      /* さりげない区切り */
+    box-shadow:var(--header-shadow);          /* ほんのり影で“締まり” */
+    backdrop-filter:saturate(1.1);            /* iOSでの馴染み向上（対応端末のみ） */
+  }
   td.padL{padding-left:22px} /* 列間のゆとり（日付↔種別、種別↔目標 etc.） */
   td.small{width:120px}
   td.medium{width:180px}
+
+  /* 行色：today は自動（ただし手動色があればそちら優先） */
   tr.today td{
     background:var(--today-bg) !important;
     color:var(--today-text) !important;
   }
-  /* 手動着色が指定された行は本日色より優先（後勝ち） */
   tr.manual-gray td{
     background:var(--row-gray-bg) !important;
     color:var(--row-gray-text) !important;
   }
+
   @media (max-width:820px){th,td{font-size:16px}button,select,input{font-size:16px}}
 </style>
 </head>
@@ -64,7 +83,7 @@
           <th class="medium padL">目標（科目名）</th>
           <th class="medium padL">結果</th>
           <th class="medium padL">復習</th>
-          <th class="small padL">行色</th>
+          <th class="small padL">色</th> <!-- 行色→色 -->
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
@@ -74,13 +93,13 @@
 <script>
 (function(){
   'use strict';
-  const KEY='studyplanner.month.form.v2.colors';
+  const KEY='studyplanner.month.form.v3.sticky';
 
   // 月切替
   let year, month; // 0-11
   const now=new Date(); year=now.getFullYear(); month=now.getMonth();
 
-  // モデル：date(YYYY-MM-DD), type('学習'|'休日'|'復習'|''), goal, result, review, color('normal'|'gray')
+  // モデル：date(YYYY-MM-DD), type('学習'|'休日'|'復習'), goal, result, review, color('normal'|'gray')
   let rows=[];
 
   // ユーティリティ
@@ -101,7 +120,7 @@
     const have=new Set(rows.map(r=>r.date));
     need.forEach(d=>{
       if(!have.has(d)){
-        rows.push({date:d, type:'学習', goal:'', result:'', review:'', color:'normal'}); // デフォルト：学習／目標空
+        rows.push({date:d, type:'学習', goal:'', result:'', review:'', color:'normal'});
       }
     });
     rows.sort((a,b)=>a.date.localeCompare(b.date));
@@ -141,30 +160,26 @@
       const tr=document.createElement('tr');
 
       // 行色：手動gray > 本日
-      if(r.color==='gray'){
-        tr.classList.add('manual-gray');
-      }else if(date===todayStr){
-        tr.classList.add('today');
-      }
+      if(r.color==='gray') tr.classList.add('manual-gray');
+      else if(date===todayStr) tr.classList.add('today');
 
-      // 日付（8月13日(火) 形式）
+      // 日付（8月13日(火)）
       const tdDate=document.createElement('td');
       tdDate.className='medium';
       tdDate.textContent = jpDateLabel(date);
 
-      // 種別（デフォルト：学習）
+      // 種別（「未設定」を削除）
       const tdType=document.createElement('td'); tdType.className='small padL';
       const selType=document.createElement('select');
-      ['学習','休日','復習',''].forEach(opt=>{
+      ['学習','休日','復習'].forEach(opt=>{
         const o=document.createElement('option');
-        o.value=opt; o.textContent = opt||'（未設定）';
-        if((r.type||'')===opt) o.selected=true;
+        o.value=opt; o.textContent = opt;
+        if((r.type||'学習')===opt) o.selected=true;
         selType.appendChild(o);
       });
       selType.addEventListener('change',e=>{
         r.type=e.target.value;
-        // 休日なら入力欄を無効化（値は保持）
-        render(); // 表示更新（disabled切替）
+        render(); // disabled切り替え反映
         persist(r);
       });
       tdType.appendChild(selType);
@@ -193,17 +208,17 @@
       inRev.addEventListener('input',e=>{ r.review=e.target.value; persist(r); });
       tdRev.appendChild(inRev);
 
-      // 行色（手動）… 通常 / ジャンガリアン(灰)
+      // 色（手動）… 通常 / 完了（＝ジャンガリアン灰）
       const tdClr=document.createElement('td'); tdClr.className='small padL';
       const selClr=document.createElement('select');
-      [{v:'normal',t:'通常'}, {v:'gray',t:'ジャンガリアン(灰)'}].forEach(p=>{
+      [{v:'normal',t:'通常'}, {v:'gray',t:'完了'}].forEach(p=>{
         const o=document.createElement('option'); o.value=p.v; o.textContent=p.t;
         if((r.color||'normal')===p.v) o.selected=true;
         selClr.appendChild(o);
       });
       selClr.addEventListener('change',e=>{
         r.color=e.target.value;
-        render(); // 即反映（today色より手動色を優先）
+        render(); // 即反映（today色より手動色が勝つ）
         persist(r);
       });
       tdClr.appendChild(selClr);
