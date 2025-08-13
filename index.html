@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Study Planner – 月一覧（曜日つき・色最適化）</title>
+<title>Study Planner – 月一覧（曜日つき・色最適化・本日ジャンプ）</title>
 <style>
   :root{
     --line:#e5e7eb;
     --muted:#6b7280;
     --today-bg:#005A9C;      /* 本日 背景：ドジャースブルー */
     --today-text:#ffffff;    /* 本日 文字色：白 */
-    --row-gray-bg:#b0a89f;   /* 手動 背景：ジャンガリアン色 */
-    --row-gray-text:#000000; /* 手動 文字色：黒 */
+    --row-gray-bg:#b0a89f;   /* 完了 背景：ジャンガリアン色 */
+    --row-gray-text:#000000; /* 完了 文字色：黒 */
     --header-bg:#ffffff;
     --header-shadow: 0 6px 12px rgba(0,0,0,0.06); /* ほんのり影 */
   }
@@ -22,20 +22,30 @@
     color:#111827;background:#fff
   }
   h1{margin:0 0 12px;font-size:18px}
-  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
   .muted{color:var(--muted);font-size:12px}
   button,select,input[type="text"]{
     padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;font-size:16px
   }
   button.primary{background:#2563eb;border-color:#2563eb;color:#fff}
 
-  /* テーブル */
+  /* 本日表示バナー（バー直下に固定表示） */
+  .today-banner{
+    margin:6px 0 10px;
+    padding:8px 12px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:#f8fafc;
+    font-size:14px;
+  }
+
+  /* テーブル（表内スクロール。ヘッダーはsticky） */
   .tbl{
     width:100%;
     border:1px solid var(--line);
     border-radius:12px;
     overflow:auto;
-    max-height:70vh; /* 表内スクロールにしてヘッダーをstickyに */
+    max-height:82vh; /* ← 少し拡げて1〜2行ぶん余裕を作る */
   }
   table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
   th,td{padding:12px;border-bottom:1px solid var(--line);vertical-align:top;background:#fff}
@@ -43,15 +53,15 @@
     text-align:left;font-weight:600;font-size:12px;color:var(--muted);
     position:sticky; top:0; z-index:3;
     background:var(--header-bg);
-    border-bottom:2px solid var(--line);      /* さりげない区切り */
-    box-shadow:var(--header-shadow);          /* ほんのり影で“締まり” */
-    backdrop-filter:saturate(1.1);            /* iOSでの馴染み向上（対応端末のみ） */
+    border-bottom:2px solid var(--line);
+    box-shadow:var(--header-shadow);
+    backdrop-filter:saturate(1.1);
   }
-  td.padL{padding-left:22px} /* 列間のゆとり（日付↔種別、種別↔目標 etc.） */
+  td.padL{padding-left:22px} /* 列間のゆとり（日付↔種別、種別↔目標など） */
   td.small{width:120px}
   td.medium{width:180px}
 
-  /* 行色：today は自動（ただし手動色があればそちら優先） */
+  /* 行色：today は自動（ただし完了＝手動色があればそちら優先） */
   tr.today td{
     background:var(--today-bg) !important;
     color:var(--today-text) !important;
@@ -61,7 +71,25 @@
     color:var(--row-gray-text) !important;
   }
 
-  @media (max-width:820px){th,td{font-size:16px}button,select,input{font-size:16px}}
+  /* 右上＆右下の本日ジャンプボタン */
+  .fab{
+    position:fixed; z-index:5;
+    width:54px; height:54px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    border:1px solid var(--line); background:#fff;
+    box-shadow:0 10px 20px rgba(0,0,0,.12);
+    user-select:none; -webkit-user-select:none;
+  }
+  .fab:hover{transform:translateY(-1px)}
+  .fab:active{transform:translateY(0)}
+  .fab-top-right{ right:14px; top:14px; }
+  .fab-bottom-right{ right:14px; bottom:14px; }
+  .fab span{font-size:22px; line-height:1}
+
+  @media (max-width:820px){
+    th,td{font-size:16px}
+    button,select,input{font-size:16px}
+  }
 </style>
 </head>
 <body>
@@ -70,11 +98,15 @@
     <button id="prev" class="primary">◀ 前月</button>
     <div id="label" class="muted"></div>
     <button id="next" class="primary">次月 ▶</button>
+    <button id="todayBtn">⟳ 今日へ</button>
     <button id="save">💾 保存</button>
     <button id="load">📥 読込</button>
   </div>
 
-  <div class="tbl">
+  <!-- バー直下に本日のテキストを出す -->
+  <div id="todayBanner" class="today-banner">本日: 読み込み中…</div>
+
+  <div class="tbl" id="scroller">
     <table>
       <thead>
         <tr>
@@ -90,10 +122,15 @@
     </table>
   </div>
 
+  <!-- 右上：バット（大谷くんリスペクトの汎用アイコン） -->
+  <button class="fab fab-top-right" id="fabTop" title="今日へ"><span>🦾</span></button>
+  <!-- 右下：ボール（ドジャース球リスペクトの汎用アイコン） -->
+  <button class="fab fab-bottom-right" id="fabBottom" title="今日へ"><span>⚾️</span></button>
+
 <script>
 (function(){
   'use strict';
-  const KEY='studyplanner.month.form.v3.sticky';
+  const KEY='studyplanner.month.form.v4.jump';
 
   // 月切替
   let year, month; // 0-11
@@ -159,7 +196,7 @@
       const r = rows.find(x=>x.date===date) || {date, type:'学習', goal:'', result:'', review:'', color:'normal'};
       const tr=document.createElement('tr');
 
-      // 行色：手動gray > 本日
+      // 行色：完了(gray) > 本日(today)
       if(r.color==='gray') tr.classList.add('manual-gray');
       else if(date===todayStr) tr.classList.add('today');
 
@@ -232,6 +269,10 @@
 
       tb.appendChild(tr);
     });
+
+    // 本日テキスト更新
+    const t = new Date();
+    $('#todayBanner').textContent = `本日: ${t.getMonth()+1}月${t.getDate()}日(${jpWeek(t)})`;
   }
 
   function persist(rec){
@@ -239,14 +280,35 @@
     if(i>=0) rows[i]=rec; else rows.push(rec);
   }
 
-  // イベント
-  $('#prev').addEventListener('click',()=>{ month-=1; if(month<0){month=11;year-=1;} load(); render(); });
-  $('#next').addEventListener('click',()=>{ month+=1; if(month>11){month=0;year+=1;} load(); render(); });
-  $('#save').addEventListener('click',()=>{ save(); });
-  $('#load').addEventListener('click',()=>{ const ok=load(); render(); alert(ok?'読み込みました':'保存データが見つかりません'); });
+  // 「本日をヘッダー直下にスクロール」
+  function scrollTodayIntoView(){
+    const scroller = $('#scroller');
+    const thead = scroller.querySelector('thead');
+    const todayRow = scroller.querySelector('tr.today') || scroller.querySelector('tbody tr');
+    if(!todayRow) return;
+    const headerH = thead.getBoundingClientRect().height;
+    // 要素位置（スクロール容器基準）を計算
+    const rowTop = todayRow.offsetTop; // tbody内の位置
+    scroller.scrollTo({
+      top: Math.max(0, rowTop - headerH - 4),
+      behavior: 'smooth'
+    });
+  }
 
-  // 初期描画
+  // イベント
+  $('#prev').addEventListener('click',()=>{ month-=1; if(month<0){month=11;year-=1;} load(); render(); setTimeout(scrollTodayIntoView, 50); });
+  $('#next').addEventListener('click',()=>{ month+=1; if(month>11){month=0;year+=1;} load(); render(); setTimeout(scrollTodayIntoView, 50); });
+  $('#save').addEventListener('click',()=>{ save(); });
+  $('#load').addEventListener('click',()=>{ const ok=load(); render(); setTimeout(scrollTodayIntoView, 50); alert(ok?'読み込みました':'保存データが見つかりません'); });
+  $('#todayBtn').addEventListener('click',()=>{ scrollTodayIntoView(); });
+
+  // 右上/右下のジャンプボタン
+  $('#fabTop').addEventListener('click', scrollTodayIntoView);
+  $('#fabBottom').addEventListener('click', scrollTodayIntoView);
+
+  // 初期描画 → 本日へ自動スクロール
   load(); render();
+  window.addEventListener('load', ()=> setTimeout(scrollTodayIntoView, 80));
 })();
 </script>
 </body>
