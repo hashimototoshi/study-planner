@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>柔軟プランナー Pro v3-noStart（iPad安全）</title>
+<style>
+  :root { --fg:#111827; --bg:#ffffff; --muted:#6b7280; --line:#e5e7eb; --accent:#2563eb; --accent-weak:#eef2ff; }
+  * { box-sizing: border-box; }
+  body { margin:0; color:var(--fg); background:var(--bg); font-family: system-ui, -apple-system, "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", Roboto, Arial, sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; background: rgba(255,255,255,0.95); border-bottom:1px solid var(--line); }
+  header .wrap { display:flex; gap:8px; align-items:center; padding:10px 12px; flex-wrap:wrap; }
+  h1 { margin:0; font-size:16px; font-weight:700; }
+  button, select, input[type="date"], input[type="text"] {
+    padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:#fff; color:var(--fg); font-size:16px;
+  }
+  button.primary { background: var(--accent); color:#fff; border-color: var(--accent); }
+  button.ghost { background:#f8fafc; }
+  main { padding: 14px; max-width: 1100px; margin: 0 auto; }
+  .muted { color:var(--muted); font-size:12px; }
+  .tbl { width:100%; overflow:auto; border:1px solid var(--line); border-radius:12px; }
+  table { width:100%; border-collapse: separate; border-spacing:0; table-layout: fixed; }
+  th, td { padding:12px; border-bottom:1px solid var(--line); vertical-align: top; background:#fff; }
+  th { text-align:left; font-weight:600; font-size:12px; color:var(--muted); position: static; }
+  td.right { text-align:right; }
+  .pill { display:inline-block; padding:4px 10px; border-radius:999px; background: var(--accent-weak); color:#3730a3; font-size:14px; }
+  details { border:1px solid var(--line); border-radius:12px; padding:10px; background:#fafafa; }
+  details summary { cursor:pointer; font-weight:700; margin:-10px; padding:10px; }
+  .chips { display:flex; gap:8px; flex-wrap: wrap; }
+  .chip { padding:8px 12px; border-radius:999px; border:1px solid var(--line); background:#fff; display:flex; gap:8px; align-items:center; }
+  .chip button { padding:4px 8px; }
+  .bar { display:flex; gap:8px; flex-wrap: wrap; margin: 10px 0 16px; align-items:center; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .drag { cursor: grab; user-select: none; }
+  .drag:active { cursor: grabbing; }
+  .handle { width:32px; text-align:center; font-size:22px; opacity:.6; }
+  tr.dragging { opacity: .5; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+  .sep { height:10px; }
+  footer { color:var(--muted); font-size:12px; text-align:center; padding:16px; }
+  @media (max-width: 820px){
+    th, td { font-size: 16px; }
+    input, select, button { font-size: 16px; }
+    input[type="date"], select { width: 100%; }
+  }
+  .cards { display: none; gap: 12px; }
+  .card { border:1px solid var(--line); border-radius:12px; padding:12px; background:#fff; }
+  .card .row { margin-top:6px; }
+  .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>柔軟プランナー Pro v3-noStart</h1>
+    <button id="addRow" class="primary">＋ 行追加</button>
+    <button id="toggleView" class="ghost">▶ 展開を見る</button>
+    <button id="modeBtn" class="ghost">□ カード編集</button>
+    <button id="saveBtn" class="ghost">💾 保存</button>
+    <button id="loadBtn" class="ghost">📥 読込</button>
+    <button id="exportBtn" class="ghost">⬇︎ JSON</button>
+    <input id="importFile" type="file" accept=".json" style="display:none">
+    <button id="importBtn" class="ghost">⬆︎ JSON</button>
+  </div>
+</header>
+
+<main>
+  <details>
+    <summary>科目の管理</summary>
+    <div class="row" style="margin-top:8px">
+      <input id="newSubject" type="text" placeholder="科目を追加（例：世界史、英語、数学）">
+      <button id="addSubject" class="ghost">＋ 追加</button>
+      <span class="muted">現在の科目：</span>
+      <div id="subjectChips" class="chips"></div>
+    </div>
+  </details>
+
+  <div class="sep"></div>
+
+  <h3>編集ビュー</h3>
+  <div id="tableMode" class="tbl">
+    <table id="editTable">
+      <thead>
+        <tr>
+          <th style="width:40px"></th>
+          <th style="width:170px">日付</th>
+          <th style="width:150px">種別</th>
+          <th>科目（学習のとき選択）</th>
+          <th class="right" style="width:120px"></th>
+        </tr>
+      </thead>
+      <tbody id="editTbody"></tbody>
+    </table>
+  </div>
+
+  <div id="cardMode" class="cards"></div>
+
+  <div class="sep"></div>
+
+  <h3>展開ビュー（読み取り専用）</h3>
+  <div class="tbl">
+    <table id="expandedTable">
+      <thead>
+        <tr>
+          <th style="width:170px">日付</th>
+          <th style="width:170px">種別/科目</th>
+        </tr>
+      </thead>
+      <tbody id="expandedTbody"></tbody>
+    </table>
+  </div>
+
+  <footer>保存先: この端末の localStorage。カード編集に切替で重なりを回避できます。</footer>
+</main>
+
+<script>
+(function(){
+  'use strict';
+  const KEY = 'studyPlan.pro.v3.noStart';
+  const subjects = new Set(['世界史','英語']);
+  let rows = []; // { id, date, type, subjects[], order }
+
+  const $ = (sel, root=document) => root.querySelector(sel);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+  function uid(){ return Math.random().toString(36).slice(2,9); }
+  function todayStr(){ const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[m])); }
+
+  function renderSubjects(){
+    const box = $('#subjectChips');
+    box.innerHTML = '';
+    [...subjects].forEach(name=>{
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+      chip.innerHTML = `<span>${escapeHtml(name)}</span> <button class="ghost" data-del="${escapeHtml(name)}">×</button>`;
+      box.appendChild(chip);
+    });
+  }
+
+  function addRow(data){
+    const base = { id: uid(), date: todayStr(), type: '学習', subjects: ['世界史','英語'].filter(s=>subjects.has(s)), order: rows.length? Math.max(...rows.map(r=>r.order||0))+1:1 };
+    rows.push(Object.assign(base, data||{}));
+  }
+
+  function subjectChecks(selected){
+    const wrap = document.createElement('div'); wrap.className = 'chips';
+    [...subjects].forEach(name=>{
+      const span = document.createElement('span');
+      span.className = 'chip';
+      span.innerHTML = `<label><input type="checkbox" data-sub="${escapeHtml(name)}" ${selected.includes(name)?'checked':''}>${escapeHtml(name)}</label>`;
+      wrap.appendChild(span);
+    });
+    wrap.addEventListener('change', (e)=>{
+      const input = e.target; if(!input.matches('input[type="checkbox"][data-sub]')) return;
+      const name = input.getAttribute('data-sub'); const id = input.closest('tr').getAttribute('data-id');
+      const row = rows.find(x=>x.id===id); if(!row) return;
+      if(input.checked){ if(!row.subjects.includes(name)) row.subjects.push(name); }
+      else{ row.subjects = row.subjects.filter(s=>s!==name); }
+      renderExpanded(); saveLocal();
+    });
+    return wrap;
+  }
+
+  function renderTable(){
+    const tb = $('#editTbody'); tb.innerHTML='';
+    if(rows.length===0) addRow();
+    rows.sort((a,b)=> (a.order||0)-(b.order||0) || (a.date||'').localeCompare(b.date||''));
+    rows.forEach(r=>{
+      const tr = document.createElement('tr'); tr.setAttribute('data-id', r.id); tr.setAttribute('draggable','true'); tr.className='drag';
+      const tdH = document.createElement('td'); tdH.className='handle'; tdH.textContent='≡';
+
+      const tdD = document.createElement('td'); const inD=document.createElement('input'); inD.type='date'; inD.value=r.date||todayStr(); inD.addEventListener('change',e=>{ r.date=e.target.value; renderExpanded(); saveLocal(); }); tdD.appendChild(inD);
+
+      const tdType = document.createElement('td'); const sel=document.createElement('select'); ['学習','休日'].forEach(opt=>{ const o=document.createElement('option'); o.value=opt; o.textContent=opt; if(r.type===opt) o.selected=true; sel.appendChild(o); });
+      sel.addEventListener('change', e=>{ r.type=e.target.value; if(r.type==='休日') r.subjects=[]; renderAll(); saveLocal(); }); tdType.appendChild(sel);
+
+      const tdS = document.createElement('td'); tdS.appendChild(r.type==='学習'? subjectChecks(r.subjects): (function(){ const s=document.createElement('span'); s.className='muted'; s.textContent='—'; return s; })());
+
+      const tdDel = document.createElement('td'); tdDel.className='right'; const btn=document.createElement('button'); btn.textContent='削除'; btn.addEventListener('click', ()=>{ rows=rows.filter(x=>x.id!==r.id); renderAll(); saveLocal(); }); tdDel.appendChild(btn);
+
+      tr.appendChild(tdH); tr.appendChild(tdD); tr.appendChild(tdType); tr.appendChild(tdS); tr.appendChild(tdDel);
+      tb.appendChild(tr);
+    });
+    attachDnD(tb);
+  }
+
+  function renderCards(){
+    const box = $('#cardMode'); box.innerHTML='';
+    rows.forEach(r=>{
+      const card = document.createElement('div'); card.className='card'; card.setAttribute('data-id', r.id);
+      const top = document.createElement('div'); top.className='toolbar';
+      const drag = document.createElement('span'); drag.className='handle'; drag.textContent='≡';
+      const del = document.createElement('button'); del.textContent='削除'; del.addEventListener('click', ()=>{ rows=rows.filter(x=>x.id!==r.id); renderAll(); saveLocal(); });
+      top.appendChild(drag); top.appendChild(del); card.appendChild(top);
+
+      const row1 = document.createElement('div'); row1.className='row';
+      const d = document.createElement('input'); d.type='date'; d.value=r.date||todayStr(); d.addEventListener('change',e=>{ r.date=e.target.value; renderExpanded(); saveLocal(); });
+      const sel = document.createElement('select'); ['学習','休日'].forEach(opt=>{ const o=document.createElement('option'); o.value=opt; o.textContent=opt; if(r.type===opt) o.selected=true; sel.appendChild(o); });
+      sel.addEventListener('change', e=>{ r.type=e.target.value; if(r.type==='休日') r.subjects=[]; renderAll(); saveLocal(); });
+      row1.appendChild(d); row1.appendChild(sel);
+      card.appendChild(row1);
+
+      const row2 = document.createElement('div'); row2.className='row';
+      if(r.type==='学習'){ row2.appendChild(subjectChecks(r.subjects)); }
+      else { const s=document.createElement('span'); s.className='muted'; s.textContent='—'; row2.appendChild(s); }
+      card.appendChild(row2);
+
+      box.appendChild(card);
+    });
+  }
+
+  function attachDnD(tbody){
+    let draggingEl = null;
+    let placeholder = document.createElement('tr');
+    placeholder.innerHTML = '<td colspan="5" style="height:8px; border:none;"></td>';
+
+    tbody.addEventListener('dragstart', e=>{
+      const tr = e.target.closest('tr.drag'); if(!tr) return;
+      draggingEl = tr; tr.classList.add('dragging');
+      e.dataTransfer.effectAllowed = "move";
+      try{ e.dataTransfer.setData('text/plain', tr.getAttribute('data-id')); }catch(_){}
+    });
+    tbody.addEventListener('dragend', ()=>{
+      if(draggingEl){ draggingEl.classList.remove('dragging'); draggingEl = null; }
+      if(placeholder.parentNode) placeholder.parentNode.removeChild(placeholder);
+      saveOrderFromDOM(tbody);
+    });
+    tbody.addEventListener('dragover', e=>{
+      e.preventDefault();
+      const after = getRowAfterY(tbody, e.clientY);
+      if(after == null){ tbody.appendChild(placeholder); } else { tbody.insertBefore(placeholder, after); }
+    });
+    tbody.addEventListener('drop', e=>{
+      e.preventDefault();
+      if(!draggingEl) return;
+      if(placeholder.parentNode){ tbody.insertBefore(draggingEl, placeholder); placeholder.parentNode.removeChild(placeholder); }
+      saveOrderFromDOM(tbody);
+    });
+
+    function getRowAfterY(container, y){
+      const rowsArr = $$('.drag', container).filter(r=>r!==draggingEl);
+      let nearest = null; let nearestOffset = Number.NEGATIVE_INFINITY;
+      rowsArr.forEach(row=>{
+        const box = row.getBoundingClientRect();
+        const offset = y - box.top - box.height/2;
+        if(offset < 0 && offset > nearestOffset){ nearestOffset = offset; nearest = row; }
+      });
+      return nearest;
+    }
+  }
+  function saveOrderFromDOM(tbody){
+    const ids = $$('.drag', tbody).map(tr => tr.getAttribute('data-id'));
+    ids.forEach((id, idx)=>{ const row = rows.find(r=>r.id===id); if(row) row.order = idx+1; });
+    saveLocal();
+  }
+
+  function renderExpanded(){
+    const tb = $('#expandedTbody'); tb.innerHTML='';
+    const out=[];
+    rows.forEach(r=>{
+      if(!r.date) return;
+      if(r.type==='休日'){ out.push({ date:r.date, label:'休日', order:r.order||0 }); }
+      else if(r.subjects.length===0){ out.push({ date:r.date, label:'学習（未選択）', order:r.order||0 }); }
+      else { r.subjects.forEach(s=> out.push({ date:r.date, label:s, order:r.order||0 })); }
+    });
+    out.sort((a,b)=> (a.date||'').localeCompare(b.date||'') || a.order - b.order || a.label.localeCompare(b.label));
+    out.forEach(rec=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHtml(rec.date)}</td><td><span class="pill">${escapeHtml(rec.label)}</span></td>`;
+      tb.appendChild(tr);
+    });
+  }
+
+  function renderAll(){
+    renderSubjects();
+    renderTable();
+    renderCards();
+    renderExpanded();
+  }
+
+  function saveLocal(){
+    const payload = { rows, subjects:[...subjects] };
+    try{ localStorage.setItem(KEY, JSON.stringify(payload)); }catch(e){}
+  }
+  function loadLocal(){
+    const raw = localStorage.getItem(KEY); if(!raw) return false;
+    try{ const data = JSON.parse(raw); rows = Array.isArray(data.rows)? data.rows: []; subjects.clear(); (data.subjects||[]).forEach(s=> subjects.add(s)); return true; }catch(e){ return false; }
+  }
+  function exportJSON(){
+    const payload = { rows, subjects:[...subjects] };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='study-plan-pro-v3-noStart.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  }
+  function importJSON(file){
+    const reader = new FileReader();
+    reader.onload = e => { try{ const data=JSON.parse(e.target.result); rows=Array.isArray(data.rows)? data.rows: []; subjects.clear(); (data.subjects||[]).forEach(s=> subjects.add(s)); renderAll(); saveLocal(); } catch(err){ alert('読み込み失敗: ' + err.message); } };
+    reader.readAsText(file);
+  }
+
+  // events
+  $('#addRow').addEventListener('click', ()=>{ addRow(); renderAll(); saveLocal(); });
+  $('#toggleView').addEventListener('click', ()=>{ const y=$('#expandedTable').getBoundingClientRect().top + window.scrollY - 70; window.scrollTo({ top:y, behavior:'smooth' }); });
+  $('#modeBtn').addEventListener('click', ()=>{
+    const table = $('#tableMode'); const cards = $('#cardMode');
+    if(cards.style.display !== 'flex'){ cards.style.display = 'flex'; table.style.display='none'; $('#modeBtn').textContent='▤ テーブル編集'; }
+    else { cards.style.display = 'none'; table.style.display='block'; $('#modeBtn').textContent='□ カード編集'; }
+  });
+  $('#saveBtn').addEventListener('click', ()=>{ saveLocal(); alert('保存しました（この端末のブラウザ内）'); });
+  $('#loadBtn').addEventListener('click', ()=>{ const ok = loadLocal(); renderAll(); alert(ok?'読み込みました':'保存データが見つかりません'); });
+  $('#exportBtn').addEventListener('click', exportJSON);
+  $('#importBtn').addEventListener('click', ()=> $('#importFile').click());
+  $('#importFile').addEventListener('change', e=>{ if(e.target.files[0]) importJSON(e.target.files[0]); });
+  $('#addSubject').addEventListener('click', ()=>{
+    const v = ($('#newSubject').value||'').trim(); if(!v){ alert('科目名を入力してください'); return; }
+    subjects.add(v); $('#newSubject').value=''; renderAll(); saveLocal();
+  });
+  document.addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-del]');
+    if(!btn) return;
+    const name = btn.getAttribute('data-del');
+    subjects.delete(name);
+    rows.forEach(r => r.subjects = r.subjects.filter(s=> s !== name));
+    renderAll();
+    saveLocal();
+  }, {passive:true});
+
+  if(!loadLocal()) addRow();
+  renderAll();
+})();
+</script>
+</body>
+</html>
