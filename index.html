@@ -3,17 +3,17 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Study Planner – 月一覧（曜日つき・色最適化・本日ジャンプ）</title>
+<title>Study Planner – 月一覧＋順位表</title>
 <style>
   :root{
-    --line:#e5e7eb;
-    --muted:#6b7280;
-    --today-bg:#005A9C;      /* 本日 背景：ドジャースブルー */
-    --today-text:#ffffff;    /* 本日 文字色：白 */
-    --row-gray-bg:#b0a89f;   /* 完了 背景：ジャンガリアン色 */
-    --row-gray-text:#000000; /* 完了 文字色：黒 */
+    --line:#e5e7eb; --muted:#6b7280;
+    --today-bg:#005A9C;      /* 本日：ドジャースブルー */
+    --today-text:#ffffff;    /* 本日 文字色 */
+    --row-gray-bg:#b0a89f;   /* 完了：ジャンガリアン灰 */
+    --row-gray-text:#000000; /* 完了 文字色 */
     --header-bg:#ffffff;
-    --header-shadow: 0 6px 12px rgba(0,0,0,0.06); /* ほんのり影 */
+    --header-shadow:0 6px 12px rgba(0,0,0,.06);
+    --accent:#2563eb;
   }
   *{box-sizing:border-box}
   body{
@@ -27,73 +27,68 @@
   button,select,input[type="text"]{
     padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;font-size:16px
   }
-  button.primary{background:#2563eb;border-color:#2563eb;color:#fff}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 
-  /* 本日表示バナー（バー直下に固定表示） */
   .today-banner{
-    margin:6px 0 10px;
-    padding:8px 12px;
-    border:1px solid var(--line);
-    border-radius:10px;
-    background:#f8fafc;
-    font-size:14px;
+    margin:6px 0 10px;padding:8px 12px;border:1px solid var(--line);
+    border-radius:10px;background:#f8fafc;font-size:14px
   }
 
-  /* テーブル（表内スクロール。ヘッダーはsticky） */
+  .layout{
+    display:grid;gap:12px;grid-template-columns:1fr;align-items:start;
+  }
+  @media(min-width:980px){
+    .layout{grid-template-columns: minmax(0,1fr) 320px;}
+  }
+
   .tbl{
-    width:100%;
-    border:1px solid var(--line);
-    border-radius:12px;
-    overflow:auto;
-    max-height:82vh; /* ← 少し拡げて1〜2行ぶん余裕を作る */
+    width:100%;border:1px solid var(--line);border-radius:12px;overflow:auto;max-height:82vh;
   }
   table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
   th,td{padding:12px;border-bottom:1px solid var(--line);vertical-align:top;background:#fff}
   th{
     text-align:left;font-weight:600;font-size:12px;color:var(--muted);
-    position:sticky; top:0; z-index:3;
-    background:var(--header-bg);
-    border-bottom:2px solid var(--line);
-    box-shadow:var(--header-shadow);
-    backdrop-filter:saturate(1.1);
+    position:sticky;top:0;z-index:3;background:var(--header-bg);
+    border-bottom:2px solid var(--line);box-shadow:var(--header-shadow);backdrop-filter:saturate(1.1);
   }
-  td.padL{padding-left:22px} /* 列間のゆとり（日付↔種別、種別↔目標など） */
+  td.padL{padding-left:22px}
   td.small{width:120px}
   td.medium{width:180px}
 
-  /* 行色：today は自動（ただし完了＝手動色があればそちら優先） */
-  tr.today td{
-    background:var(--today-bg) !important;
-    color:var(--today-text) !important;
-  }
-  tr.manual-gray td{
-    background:var(--row-gray-bg) !important;
-    color:var(--row-gray-text) !important;
-  }
+  tr.today td{background:var(--today-bg)!important;color:var(--today-text)!important}
+  tr.manual-gray td{background:var(--row-gray-bg)!important;color:var(--row-gray-text)!important}
 
-  /* 右上＆右下の本日ジャンプボタン */
+  .card{
+    border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff
+  }
+  .card h3{margin:0 0 8px;font-size:15px}
+  .lb-row{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:8px;border-bottom:1px dashed var(--line)
+  }
+  .lb-row:last-child{border-bottom:none}
+  .me{background:#eef2ff;border-radius:8px}
+  .name{display:flex;gap:8px;align-items:center}
+  .rank{width:26px;text-align:center;font-weight:700}
+  .pts{font-variant-numeric:tabular-nums}
+  .chip{display:inline-block;padding:2px 8px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:12px;color:#374151}
   .fab{
-    position:fixed; z-index:5;
-    width:54px; height:54px; border-radius:50%;
-    display:flex; align-items:center; justify-content:center;
-    border:1px solid var(--line); background:#fff;
-    box-shadow:0 10px 20px rgba(0,0,0,.12);
-    user-select:none; -webkit-user-select:none;
+    position:fixed;z-index:5;width:54px;height:54px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;border:1px solid var(--line);background:#fff;
+    box-shadow:0 10px 20px rgba(0,0,0,.12);user-select:none;-webkit-user-select:none
   }
-  .fab:hover{transform:translateY(-1px)}
-  .fab:active{transform:translateY(0)}
-  .fab-top-right{ right:14px; top:14px; }
-  .fab-bottom-right{ right:14px; bottom:14px; }
-  .fab span{font-size:22px; line-height:1}
-
-  @media (max-width:820px){
-    th,td{font-size:16px}
-    button,select,input{font-size:16px}
-  }
+  .fab:hover{transform:translateY(-1px)} .fab:active{transform:translateY(0)}
+  .fab-top-right{right:14px;top:14px} .fab-bottom-right{right:14px;bottom:14px}
+  .fab span{font-size:22px;line-height:1}
 </style>
 </head>
 <body>
-  <h1>学習計画（1ヶ月表示／曜日つき）</h1>
+  <h1>学習計画（1ヶ月表示／順位つき）</h1>
+  <div class="bar">
+    <input id="displayName" type="text" placeholder="表示名（自分の名前）" style="min-width:200px">
+    <button id="saveName">保存</button>
+    <span class="muted">※一度入れると端末に保存されます</span>
+  </div>
   <div class="bar">
     <button id="prev" class="primary">◀ 前月</button>
     <div id="label" class="muted"></div>
@@ -102,35 +97,46 @@
     <button id="save">💾 保存</button>
     <button id="load">📥 読込</button>
   </div>
-
-  <!-- バー直下に本日のテキストを出す -->
   <div id="todayBanner" class="today-banner">本日: 読み込み中…</div>
 
-  <div class="tbl" id="scroller">
-    <table>
-      <thead>
-        <tr>
-          <th class="medium">日付</th>
-          <th class="small padL">種別</th>
-          <th class="medium padL">目標（科目名）</th>
-          <th class="medium padL">結果</th>
-          <th class="medium padL">復習</th>
-          <th class="small padL">色</th> <!-- 行色→色 -->
-        </tr>
-      </thead>
-      <tbody id="tbody"></tbody>
-    </table>
+  <div class="layout">
+    <!-- 左：計画表 -->
+    <div class="tbl" id="scroller">
+      <table>
+        <thead>
+          <tr>
+            <th class="medium">日付</th>
+            <th class="small padL">種別</th>
+            <th class="medium padL">目標（科目名）</th>
+            <th class="medium padL">結果</th>
+            <th class="medium padL">復習</th>
+            <th class="small padL">色</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- 右：順位表 -->
+    <aside class="card">
+      <h3>今月の順位（合計ポイント）</h3>
+      <div id="leaderboard"></div>
+      <div style="margin-top:8px" class="muted">
+        ルール：<span class="chip">完了=+10</span>、<span class="chip">復習+完了=+6</span>、休日=0。<br>
+        クラスメイトは日替わりで自動スコア（チートなし）。
+      </div>
+    </aside>
   </div>
 
-  <!-- 右上：バット（大谷くんリスペクトの汎用アイコン） -->
+  <!-- 右上：バット／右下：ボール -->
   <button class="fab fab-top-right" id="fabTop" title="今日へ"><span>🦾</span></button>
-  <!-- 右下：ボール（ドジャース球リスペクトの汎用アイコン） -->
   <button class="fab fab-bottom-right" id="fabBottom" title="今日へ"><span>⚾️</span></button>
 
 <script>
 (function(){
   'use strict';
-  const KEY='studyplanner.month.form.v4.jump';
+  const KEY='studyplanner.month.form.v5.leader';
+  const NAME_KEY='studyplanner.displayName';
 
   // 月切替
   let year, month; // 0-11
@@ -139,12 +145,23 @@
   // モデル：date(YYYY-MM-DD), type('学習'|'休日'|'復習'), goal, result, review, color('normal'|'gray')
   let rows=[];
 
-  // ユーティリティ
+  // 自分の表示名
   const $=sel=>document.querySelector(sel);
   const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   const fromYmd=s=>{const [y,m,d]=s.split('-').map(Number); return new Date(y, m-1, d);};
   const jpWeek=d=>'日月火水木金土'[d.getDay()];
   const jpDateLabel=s=>{const d=fromYmd(s);return `${d.getMonth()+1}月${d.getDate()}日(${jpWeek(d)})`;};
+
+  // クラスメイト（固定の顔ぶれ）
+  const classmates = [
+    '佐藤', '鈴木', '田中', '高橋', '伊藤'
+  ];
+
+  // 擬似乱数（同じ月は同じ結果になるように）
+  function seedRand(seed){
+    let x = seed % 2147483647; if (x <= 0) x += 2147483646;
+    return ()=> (x = x * 16807 % 2147483647) / 2147483647;
+  }
 
   function monthDates(y,m){
     const first=new Date(y,m,1), last=new Date(y,m+1,0), arr=[];
@@ -169,6 +186,7 @@
       const data=rows.filter(r=>fromYmd(r.date).getMonth()===month && fromYmd(r.date).getFullYear()===year);
       localStorage.setItem(key, JSON.stringify(data));
       alert('保存しました（この端末のブラウザ内）');
+      renderLeaderboard(); // 保存のたびに順位再計算
     }catch(e){}
   }
 
@@ -185,6 +203,61 @@
     }catch(e){ return false; }
   }
 
+  function myMonthlyPoints(){
+    // 「完了(gray)」の日が+10。type=復習 かつ 完了 は +6 とする。
+    let total = 0;
+    monthDates(year,month).forEach(date=>{
+      const r = rows.find(x=>x.date===date);
+      if(!r) return;
+      if(r.color==='gray'){ // 完了
+        if(r.type==='復習') total += 6;
+        else if(r.type==='学習') total += 10;
+        // 休日は完了にしない前提だが、しても0扱いにしたい場合はここで分岐
+      }
+    });
+    return total;
+  }
+
+  function classmatesMonthlyPoints(){
+    // 月(YYYYMM) をシードにして、各日少しぶれる点数を与える
+    const seed = parseInt(`${year}${String(month+1).padStart(2,'0')}`);
+    const rnd = seedRand(seed);
+    const dates = monthDates(year,month);
+    return classmates.map(name=>{
+      let sum=0;
+      dates.forEach(d=>{
+        const r = rnd();
+        // その日やる気：0〜1 → 0.35以上のとき勉強、学習 or 復習を判定
+        if(r > 0.65) sum += 10;        // しっかり学習
+        else if(r > 0.50) sum += 6;    // 復習
+        // else 0（休む）
+      });
+      return { name, pts: sum };
+    });
+  }
+
+  function renderLeaderboard(){
+    const meName = ($('#displayName').value || 'あなた').trim();
+    const mePts = myMonthlyPoints();
+    const rivals = classmatesMonthlyPoints();
+    const list = [...rivals, {name: meName, pts: mePts, me:true}];
+    list.sort((a,b)=> b.pts - a.pts);
+
+    const box = $('#leaderboard'); box.innerHTML='';
+    list.forEach((p, idx)=>{
+      const row = document.createElement('div');
+      row.className = 'lb-row' + (p.me ? ' me' : '');
+      row.innerHTML = `
+        <div class="name">
+          <span class="rank">${idx+1}</span>
+          <strong>${p.name}</strong>
+        </div>
+        <div class="pts">${p.pts} pt</div>
+      `;
+      box.appendChild(row);
+    });
+  }
+
   function render(){
     ensureScaffold();
     $('#label').textContent=`${year}年${month+1}月（${monthDates(year,month).length}日）`;
@@ -196,56 +269,43 @@
       const r = rows.find(x=>x.date===date) || {date, type:'学習', goal:'', result:'', review:'', color:'normal'};
       const tr=document.createElement('tr');
 
-      // 行色：完了(gray) > 本日(today)
       if(r.color==='gray') tr.classList.add('manual-gray');
       else if(date===todayStr) tr.classList.add('today');
 
-      // 日付（8月13日(火)）
       const tdDate=document.createElement('td');
       tdDate.className='medium';
       tdDate.textContent = jpDateLabel(date);
 
-      // 種別（「未設定」を削除）
       const tdType=document.createElement('td'); tdType.className='small padL';
       const selType=document.createElement('select');
       ['学習','休日','復習'].forEach(opt=>{
-        const o=document.createElement('option');
-        o.value=opt; o.textContent = opt;
+        const o=document.createElement('option'); o.value=opt; o.textContent = opt;
         if((r.type||'学習')===opt) o.selected=true;
         selType.appendChild(o);
       });
       selType.addEventListener('change',e=>{
-        r.type=e.target.value;
-        render(); // disabled切り替え反映
-        persist(r);
+        r.type=e.target.value; render(); persist(r);
       });
       tdType.appendChild(selType);
 
-      // 目標（科目名）※空欄スタート
       const tdGoal=document.createElement('td'); tdGoal.className='medium padL';
       const inGoal=document.createElement('input'); inGoal.type='text'; inGoal.placeholder='例：世界史 23〜24';
-      inGoal.value=r.goal||'';
-      inGoal.disabled = (r.type==='休日');
+      inGoal.value=r.goal||''; inGoal.disabled = (r.type==='休日');
       inGoal.addEventListener('input',e=>{ r.goal=e.target.value; persist(r); });
       tdGoal.appendChild(inGoal);
 
-      // 結果
       const tdRes=document.createElement('td'); tdRes.className='medium padL';
       const inRes=document.createElement('input'); inRes.type='text'; inRes.placeholder='実績';
-      inRes.value=r.result||'';
-      inRes.disabled = (r.type==='休日');
+      inRes.value=r.result||''; inRes.disabled = (r.type==='休日');
       inRes.addEventListener('input',e=>{ r.result=e.target.value; persist(r); });
       tdRes.appendChild(inRes);
 
-      // 復習
       const tdRev=document.createElement('td'); tdRev.className='medium padL';
       const inRev=document.createElement('input'); inRev.type='text'; inRev.placeholder='復習範囲';
-      inRev.value=r.review||'';
-      inRev.disabled = (r.type==='休日');
+      inRev.value=r.review||''; inRev.disabled = (r.type==='休日');
       inRev.addEventListener('input',e=>{ r.review=e.target.value; persist(r); });
       tdRev.appendChild(inRev);
 
-      // 色（手動）… 通常 / 完了（＝ジャンガリアン灰）
       const tdClr=document.createElement('td'); tdClr.className='small padL';
       const selClr=document.createElement('select');
       [{v:'normal',t:'通常'}, {v:'gray',t:'完了'}].forEach(p=>{
@@ -254,25 +314,18 @@
         selClr.appendChild(o);
       });
       selClr.addEventListener('change',e=>{
-        r.color=e.target.value;
-        render(); // 即反映（today色より手動色が勝つ）
-        persist(r);
+        r.color=e.target.value; render(); persist(r); renderLeaderboard();
       });
       tdClr.appendChild(selClr);
 
-      tr.appendChild(tdDate);
-      tr.appendChild(tdType);
-      tr.appendChild(tdGoal);
-      tr.appendChild(tdRes);
-      tr.appendChild(tdRev);
-      tr.appendChild(tdClr);
-
+      tr.appendChild(tdDate); tr.appendChild(tdType); tr.appendChild(tdGoal);
+      tr.appendChild(tdRes); tr.appendChild(tdRev); tr.appendChild(tdClr);
       tb.appendChild(tr);
     });
 
-    // 本日テキスト更新
     const t = new Date();
     $('#todayBanner').textContent = `本日: ${t.getMonth()+1}月${t.getDate()}日(${jpWeek(t)})`;
+    renderLeaderboard();
   }
 
   function persist(rec){
@@ -280,33 +333,33 @@
     if(i>=0) rows[i]=rec; else rows.push(rec);
   }
 
-  // 「本日をヘッダー直下にスクロール」
   function scrollTodayIntoView(){
     const scroller = $('#scroller');
     const thead = scroller.querySelector('thead');
     const todayRow = scroller.querySelector('tr.today') || scroller.querySelector('tbody tr');
     if(!todayRow) return;
     const headerH = thead.getBoundingClientRect().height;
-    // 要素位置（スクロール容器基準）を計算
-    const rowTop = todayRow.offsetTop; // tbody内の位置
-    scroller.scrollTo({
-      top: Math.max(0, rowTop - headerH - 4),
-      behavior: 'smooth'
-    });
+    const rowTop = todayRow.offsetTop;
+    scroller.scrollTo({ top: Math.max(0, rowTop - headerH - 4), behavior: 'smooth' });
   }
 
+  // 名前読み込み
+  (function initName(){
+    const saved = localStorage.getItem(NAME_KEY);
+    if(saved) $('#displayName').value = saved;
+  })();
+
   // イベント
+  $('#saveName').addEventListener('click',()=>{ localStorage.setItem(NAME_KEY, ($('#displayName').value||'あなた').trim()); renderLeaderboard(); });
   $('#prev').addEventListener('click',()=>{ month-=1; if(month<0){month=11;year-=1;} load(); render(); setTimeout(scrollTodayIntoView, 50); });
   $('#next').addEventListener('click',()=>{ month+=1; if(month>11){month=0;year+=1;} load(); render(); setTimeout(scrollTodayIntoView, 50); });
-  $('#save').addEventListener('click',()=>{ save(); });
+  $('#save').addEventListener('click',save);
   $('#load').addEventListener('click',()=>{ const ok=load(); render(); setTimeout(scrollTodayIntoView, 50); alert(ok?'読み込みました':'保存データが見つかりません'); });
-  $('#todayBtn').addEventListener('click',()=>{ scrollTodayIntoView(); });
+  $('#todayBtn').addEventListener('click',scrollTodayIntoView);
+  $('#fabTop').addEventListener('click',scrollTodayIntoView);
+  $('#fabBottom').addEventListener('click',scrollTodayIntoView);
 
-  // 右上/右下のジャンプボタン
-  $('#fabTop').addEventListener('click', scrollTodayIntoView);
-  $('#fabBottom').addEventListener('click', scrollTodayIntoView);
-
-  // 初期描画 → 本日へ自動スクロール
+  // 初期描画
   load(); render();
   window.addEventListener('load', ()=> setTimeout(scrollTodayIntoView, 80));
 })();
