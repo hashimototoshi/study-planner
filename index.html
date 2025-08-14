@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Study Planner – 月一覧＋順位表</title>
+<title>Study Planner – 進捗 & クラスメイト（1年B組）</title>
 <style>
   :root{
     --line:#e5e7eb; --muted:#6b7280;
     --today-bg:#005A9C;      /* 本日：ドジャースブルー */
-    --today-text:#ffffff;    /* 本日 文字色 */
+    --today-text:#ffffff;
     --row-gray-bg:#b0a89f;   /* 完了：ジャンガリアン灰 */
-    --row-gray-text:#000000; /* 完了 文字色 */
+    --row-gray-text:#000000;
     --header-bg:#ffffff;
     --header-shadow:0 6px 12px rgba(0,0,0,.06);
     --accent:#2563eb;
@@ -22,25 +22,31 @@
     color:#111827;background:#fff
   }
   h1{margin:0 0 12px;font-size:18px}
-  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+  .topbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
   .muted{color:var(--muted);font-size:12px}
   button,select,input[type="text"]{
     padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;font-size:16px
   }
   button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .tabs{display:flex;gap:8px;margin:6px 0 10px}
+  .tab{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:#fff}
+  .tab.active{background:#eef2ff;border-color:#c7d2fe}
 
-  .today-banner{
-    margin:6px 0 10px;padding:8px 12px;border:1px solid var(--line);
-    border-radius:10px;background:#f8fafc;font-size:14px
-  }
-
+  /* 共通カード/レイアウト */
   .layout{
     display:grid;gap:12px;grid-template-columns:1fr;align-items:start;
   }
   @media(min-width:980px){
-    .layout{grid-template-columns: minmax(0,1fr) 320px;}
+    .layout{grid-template-columns:minmax(0,1fr) 320px;}
   }
+  .card{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff}
+  .card h3{margin:0 0 8px;font-size:15px}
 
+  /* 進捗ページ：テーブル */
+  .today-banner{
+    margin:6px 0 10px;padding:8px 12px;border:1px solid var(--line);
+    border-radius:10px;background:#f8fafc;font-size:14px
+  }
   .tbl{
     width:100%;border:1px solid var(--line);border-radius:12px;overflow:auto;max-height:82vh;
   }
@@ -54,24 +60,16 @@
   td.padL{padding-left:22px}
   td.small{width:120px}
   td.medium{width:180px}
-
   tr.today td{background:var(--today-bg)!important;color:var(--today-text)!important}
   tr.manual-gray td{background:var(--row-gray-bg)!important;color:var(--row-gray-text)!important}
 
-  .card{
-    border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff
-  }
-  .card h3{margin:0 0 8px;font-size:15px}
-  .lb-row{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:8px;border-bottom:1px dashed var(--line)
-  }
+  .lb-row{display:flex;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px dashed var(--line)}
   .lb-row:last-child{border-bottom:none}
   .me{background:#eef2ff;border-radius:8px}
-  .name{display:flex;gap:8px;align-items:center}
   .rank{width:26px;text-align:center;font-weight:700}
   .pts{font-variant-numeric:tabular-nums}
   .chip{display:inline-block;padding:2px 8px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:12px;color:#374151}
+
   .fab{
     position:fixed;z-index:5;width:54px;height:54px;border-radius:50%;
     display:flex;align-items:center;justify-content:center;border:1px solid var(--line);background:#fff;
@@ -80,116 +78,153 @@
   .fab:hover{transform:translateY(-1px)} .fab:active{transform:translateY(0)}
   .fab-top-right{right:14px;top:14px} .fab-bottom-right{right:14px;bottom:14px}
   .fab span{font-size:22px;line-height:1}
+
+  /* クラスメイトページ（教室） */
+  .classroom-wrap{display:flex;flex-direction:column;gap:10px}
+  .blackboard{
+    border-radius:10px;border:2px solid #2f4f4f;background:#0f3b3f;color:#e0f2f1;
+    padding:10px 12px;font-weight:600
+  }
+  .room{
+    border:1px solid var(--line);border-radius:12px;padding:14px;background:#fafafa
+  }
+  .desks{
+    display:grid;gap:12px;
+    grid-template-columns:repeat(3, minmax(0,1fr));
+  }
+  .desk{
+    background:#ffffff;border:1px solid var(--line);border-radius:12px;padding:10px;
+    min-height:90px;display:flex;flex-direction:column;justify-content:space-between;position:relative
+  }
+  .desk .name{font-weight:700}
+  .desk .role{font-size:12px;color:var(--muted)}
+  .bubble{
+    position:absolute;left:8px;top:-6px;transform:translateY(-100%);
+    background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:14px;box-shadow:0 6px 12px rgba(0,0,0,.06);
+    display:none;max-width:240px
+  }
+  .bubble.show{display:block;animation:fadeIn .15s ease}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(-110%)}to{opacity:1;transform:translateY(-100%)}}
+  .actions{display:flex;gap:8px;flex-wrap:wrap}
 </style>
 </head>
 <body>
-  <h1>学習計画（1ヶ月表示／順位つき）</h1>
-  <div class="bar">
+  <h1>学習計画（1ヶ月表示）</h1>
+
+  <!-- グローバル：表示名 -->
+  <div class="topbar">
     <input id="displayName" type="text" placeholder="表示名（自分の名前）" style="min-width:200px">
     <button id="saveName">保存</button>
-    <span class="muted">※一度入れると端末に保存されます</span>
+    <span class="muted">※保存すると全ページで使います</span>
   </div>
-  <div class="bar">
-    <button id="prev" class="primary">◀ 前月</button>
-    <div id="label" class="muted"></div>
-    <button id="next" class="primary">次月 ▶</button>
-    <button id="todayBtn">⟳ 今日へ</button>
-    <button id="save">💾 保存</button>
-    <button id="load">📥 読込</button>
-  </div>
-  <div id="todayBanner" class="today-banner">本日: 読み込み中…</div>
 
-  <div class="layout">
-    <!-- 左：計画表 -->
-    <div class="tbl" id="scroller">
-      <table>
-        <thead>
-          <tr>
-            <th class="medium">日付</th>
-            <th class="small padL">種別</th>
-            <th class="medium padL">目標（科目名）</th>
-            <th class="medium padL">結果</th>
-            <th class="medium padL">復習</th>
-            <th class="small padL">色</th>
-          </tr>
-        </thead>
-        <tbody id="tbody"></tbody>
-      </table>
+  <!-- ページタブ -->
+  <div class="tabs">
+    <button id="tabProgress" class="tab active">進捗</button>
+    <button id="tabClass" class="tab">クラスメイト</button>
+  </div>
+
+  <!-- ===== Page 1: 進捗 ===== -->
+  <section id="pageProgress" style="display:block">
+    <div class="topbar">
+      <button id="prev" class="primary">◀ 前月</button>
+      <div id="label" class="muted"></div>
+      <button id="next" class="primary">次月 ▶</button>
+      <button id="todayBtn">⟳ 今日へ</button>
+      <button id="save">💾 保存</button>
+      <button id="load">📥 読込</button>
+    </div>
+    <div id="todayBanner" class="today-banner">本日: 読み込み中…</div>
+
+    <div class="layout">
+      <div class="tbl" id="scroller">
+        <table>
+          <thead>
+            <tr>
+              <th class="medium">日付</th>
+              <th class="small padL">種別</th>
+              <th class="medium padL">目標（科目名）</th>
+              <th class="medium padL">結果</th>
+              <th class="medium padL">復習</th>
+              <th class="small padL">色</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+
+      <aside class="card">
+        <h3>今月の順位（合計ポイント）</h3>
+        <div id="leaderboard"></div>
+        <div style="margin-top:8px" class="muted">
+          ルール：<span class="chip">完了=+10</span>、<span class="chip">復習+完了=+6</span>、休日=0。<br>
+          クラスメイトは日替わりで自動スコア（チートなし）。
+        </div>
+      </aside>
     </div>
 
-    <!-- 右：順位表 -->
-    <aside class="card">
-      <h3>今月の順位（合計ポイント）</h3>
-      <div id="leaderboard"></div>
-      <div style="margin-top:8px" class="muted">
-        ルール：<span class="chip">完了=+10</span>、<span class="chip">復習+完了=+6</span>、休日=0。<br>
-        クラスメイトは日替わりで自動スコア（チートなし）。
-      </div>
-    </aside>
-  </div>
+    <!-- 右上/右下：本日へ -->
+    <button class="fab fab-top-right" id="fabTop" title="今日へ"><span>🦾</span></button>
+    <button class="fab fab-bottom-right" id="fabBottom" title="今日へ"><span>⚾️</span></button>
+  </section>
 
-  <!-- 右上：バット／右下：ボール -->
-  <button class="fab fab-top-right" id="fabTop" title="今日へ"><span>🦾</span></button>
-  <button class="fab fab-bottom-right" id="fabBottom" title="今日へ"><span>⚾️</span></button>
+  <!-- ===== Page 2: クラスメイト（教室） ===== -->
+  <section id="pageClass" style="display:none">
+    <div class="classroom-wrap">
+      <div class="blackboard">1年B組 – クラスメイトからのひとことでモチベUP！</div>
+      <div class="room">
+        <div class="actions" style="margin-bottom:10px">
+          <button id="sayBtn" class="primary">💬 励ましをもらう</button>
+          <span class="muted">※ランダムなクラスメイトがあなたに一言</span>
+        </div>
+        <div class="desks" id="desks">
+          <!-- 机はJSで生成：6人（あなた＋5人） -->
+        </div>
+      </div>
+    </div>
+  </section>
 
 <script>
 (function(){
   'use strict';
-  const KEY='studyplanner.month.form.v5.leader';
+  /* ========= 共通データ ========= */
+  const KEY='studyplanner.month.form.v6.twopages';
   const NAME_KEY='studyplanner.displayName';
+  const classmates = ['佐藤','鈴木','田中','高橋','伊藤']; // + あなた
 
-  // 月切替
-  let year, month; // 0-11
-  const now=new Date(); year=now.getFullYear(); month=now.getMonth();
-
-  // モデル：date(YYYY-MM-DD), type('学習'|'休日'|'復習'), goal, result, review, color('normal'|'gray')
-  let rows=[];
-
-  // 自分の表示名
   const $=sel=>document.querySelector(sel);
   const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   const fromYmd=s=>{const [y,m,d]=s.split('-').map(Number); return new Date(y, m-1, d);};
   const jpWeek=d=>'日月火水木金土'[d.getDay()];
   const jpDateLabel=s=>{const d=fromYmd(s);return `${d.getMonth()+1}月${d.getDate()}日(${jpWeek(d)})`;};
+  function seedRand(seed){let x=seed%2147483647; if(x<=0) x+=2147483646; return ()=> (x=x*16807%2147483647)/2147483647;}
 
-  // クラスメイト（固定の顔ぶれ）
-  const classmates = [
-    '佐藤', '鈴木', '田中', '高橋', '伊藤'
-  ];
-
-  // 擬似乱数（同じ月は同じ結果になるように）
-  function seedRand(seed){
-    let x = seed % 2147483647; if (x <= 0) x += 2147483646;
-    return ()=> (x = x * 16807 % 2147483647) / 2147483647;
-  }
+  // 月・データ
+  let year=(new Date()).getFullYear(), month=(new Date()).getMonth();
+  let rows=[]; // {date,type,goal,result,review,color}
 
   function monthDates(y,m){
     const first=new Date(y,m,1), last=new Date(y,m+1,0), arr=[];
     for(let d=new Date(first); d<=last; d.setDate(d.getDate()+1)) arr.push(ymd(d));
     return arr;
   }
-
   function ensureScaffold(){
     const need=new Set(monthDates(year,month));
     const have=new Set(rows.map(r=>r.date));
-    need.forEach(d=>{
-      if(!have.has(d)){
-        rows.push({date:d, type:'学習', goal:'', result:'', review:'', color:'normal'});
-      }
-    });
+    need.forEach(d=>{ if(!have.has(d)) rows.push({date:d,type:'学習',goal:'',result:'',review:'',color:'normal'}); });
     rows.sort((a,b)=>a.date.localeCompare(b.date));
   }
 
+  // 保存・読込
   function save(){
     try{
       const key=`${KEY}:${year}-${String(month+1).padStart(2,'0')}`;
       const data=rows.filter(r=>fromYmd(r.date).getMonth()===month && fromYmd(r.date).getFullYear()===year);
       localStorage.setItem(key, JSON.stringify(data));
       alert('保存しました（この端末のブラウザ内）');
-      renderLeaderboard(); // 保存のたびに順位再計算
+      renderLeaderboard();
     }catch(e){}
   }
-
   function load(){
     const key=`${KEY}:${year}-${String(month+1).padStart(2,'0')}`;
     const raw=localStorage.getItem(key);
@@ -197,125 +232,89 @@
     try{
       const data=JSON.parse(raw)||[];
       const map=new Map(rows.map(r=>[r.date,r]));
-      data.forEach(d=>map.set(d.date, d));
+      data.forEach(d=>map.set(d.date,d));
       rows=[...map.values()];
       return true;
     }catch(e){ return false; }
   }
+  function persist(rec){const i=rows.findIndex(x=>x.date===rec.date); if(i>=0) rows[i]=rec; else rows.push(rec);}
 
+  /* ========= 進捗ページ ========= */
   function myMonthlyPoints(){
-    // 「完了(gray)」の日が+10。type=復習 かつ 完了 は +6 とする。
-    let total = 0;
+    let total=0;
     monthDates(year,month).forEach(date=>{
-      const r = rows.find(x=>x.date===date);
-      if(!r) return;
-      if(r.color==='gray'){ // 完了
-        if(r.type==='復習') total += 6;
-        else if(r.type==='学習') total += 10;
-        // 休日は完了にしない前提だが、しても0扱いにしたい場合はここで分岐
+      const r=rows.find(x=>x.date===date); if(!r) return;
+      if(r.color==='gray'){
+        if(r.type==='復習') total+=6;
+        else if(r.type==='学習') total+=10;
       }
     });
     return total;
   }
-
   function classmatesMonthlyPoints(){
-    // 月(YYYYMM) をシードにして、各日少しぶれる点数を与える
-    const seed = parseInt(`${year}${String(month+1).padStart(2,'0')}`);
-    const rnd = seedRand(seed);
-    const dates = monthDates(year,month);
+    const seed=parseInt(`${year}${String(month+1).padStart(2,'0')}`);
+    const rnd=seedRand(seed); const dates=monthDates(year,month);
     return classmates.map(name=>{
       let sum=0;
-      dates.forEach(d=>{
-        const r = rnd();
-        // その日やる気：0〜1 → 0.35以上のとき勉強、学習 or 復習を判定
-        if(r > 0.65) sum += 10;        // しっかり学習
-        else if(r > 0.50) sum += 6;    // 復習
-        // else 0（休む）
-      });
-      return { name, pts: sum };
+      dates.forEach(()=>{const r=rnd(); if(r>0.65) sum+=10; else if(r>0.50) sum+=6;});
+      return {name, pts:sum};
     });
   }
-
   function renderLeaderboard(){
-    const meName = ($('#displayName').value || 'あなた').trim();
-    const mePts = myMonthlyPoints();
-    const rivals = classmatesMonthlyPoints();
-    const list = [...rivals, {name: meName, pts: mePts, me:true}];
-    list.sort((a,b)=> b.pts - a.pts);
-
-    const box = $('#leaderboard'); box.innerHTML='';
-    list.forEach((p, idx)=>{
-      const row = document.createElement('div');
-      row.className = 'lb-row' + (p.me ? ' me' : '');
-      row.innerHTML = `
-        <div class="name">
-          <span class="rank">${idx+1}</span>
-          <strong>${p.name}</strong>
-        </div>
-        <div class="pts">${p.pts} pt</div>
-      `;
-      box.appendChild(row);
+    const meName=($('#displayName').value||'あなた').trim();
+    const mePts=myMonthlyPoints();
+    const rivals=classmatesMonthlyPoints();
+    const list=[...rivals,{name:meName,pts:mePts,me:true}].sort((a,b)=>b.pts-a.pts);
+    const box=$('#leaderboard'); box.innerHTML='';
+    list.forEach((p,i)=>{
+      const div=document.createElement('div'); div.className='lb-row'+(p.me?' me':'');
+      div.innerHTML=`<div style="display:flex;gap:8px;align-items:center">
+        <span class="rank">${i+1}</span><strong>${p.name}</strong></div>
+        <div class="pts">${p.pts} pt</div>`;
+      box.appendChild(div);
     });
   }
-
-  function render(){
+  function renderProgress(){
     ensureScaffold();
     $('#label').textContent=`${year}年${month+1}月（${monthDates(year,month).length}日）`;
-
     const tb=$('#tbody'); tb.innerHTML='';
     const todayStr=ymd(new Date());
 
     monthDates(year,month).forEach(date=>{
-      const r = rows.find(x=>x.date===date) || {date, type:'学習', goal:'', result:'', review:'', color:'normal'};
+      const r=rows.find(x=>x.date===date) || {date,type:'学習',goal:'',result:'',review:'',color:'normal'};
       const tr=document.createElement('tr');
-
       if(r.color==='gray') tr.classList.add('manual-gray');
       else if(date===todayStr) tr.classList.add('today');
 
-      const tdDate=document.createElement('td');
-      tdDate.className='medium';
-      tdDate.textContent = jpDateLabel(date);
-
+      const tdDate=document.createElement('td'); tdDate.className='medium'; tdDate.textContent=jpDateLabel(date);
       const tdType=document.createElement('td'); tdType.className='small padL';
       const selType=document.createElement('select');
-      ['学習','休日','復習'].forEach(opt=>{
-        const o=document.createElement('option'); o.value=opt; o.textContent = opt;
-        if((r.type||'学習')===opt) o.selected=true;
-        selType.appendChild(o);
-      });
-      selType.addEventListener('change',e=>{
-        r.type=e.target.value; render(); persist(r);
-      });
+      ['学習','休日','復習'].forEach(opt=>{const o=document.createElement('option');o.value=opt;o.textContent=opt;if((r.type||'学習')===opt)o.selected=true;selType.appendChild(o);});
+      selType.addEventListener('change',e=>{r.type=e.target.value; renderProgress(); persist(r);});
       tdType.appendChild(selType);
 
       const tdGoal=document.createElement('td'); tdGoal.className='medium padL';
       const inGoal=document.createElement('input'); inGoal.type='text'; inGoal.placeholder='例：世界史 23〜24';
-      inGoal.value=r.goal||''; inGoal.disabled = (r.type==='休日');
-      inGoal.addEventListener('input',e=>{ r.goal=e.target.value; persist(r); });
+      inGoal.value=r.goal||''; inGoal.disabled=(r.type==='休日');
+      inGoal.addEventListener('input',e=>{r.goal=e.target.value; persist(r);});
       tdGoal.appendChild(inGoal);
 
       const tdRes=document.createElement('td'); tdRes.className='medium padL';
       const inRes=document.createElement('input'); inRes.type='text'; inRes.placeholder='実績';
-      inRes.value=r.result||''; inRes.disabled = (r.type==='休日');
-      inRes.addEventListener('input',e=>{ r.result=e.target.value; persist(r); });
+      inRes.value=r.result||''; inRes.disabled=(r.type==='休日');
+      inRes.addEventListener('input',e=>{r.result=e.target.value; persist(r);});
       tdRes.appendChild(inRes);
 
       const tdRev=document.createElement('td'); tdRev.className='medium padL';
       const inRev=document.createElement('input'); inRev.type='text'; inRev.placeholder='復習範囲';
-      inRev.value=r.review||''; inRev.disabled = (r.type==='休日');
-      inRev.addEventListener('input',e=>{ r.review=e.target.value; persist(r); });
+      inRev.value=r.review||''; inRev.disabled=(r.type==='休日');
+      inRev.addEventListener('input',e=>{r.review=e.target.value; persist(r);});
       tdRev.appendChild(inRev);
 
       const tdClr=document.createElement('td'); tdClr.className='small padL';
       const selClr=document.createElement('select');
-      [{v:'normal',t:'通常'}, {v:'gray',t:'完了'}].forEach(p=>{
-        const o=document.createElement('option'); o.value=p.v; o.textContent=p.t;
-        if((r.color||'normal')===p.v) o.selected=true;
-        selClr.appendChild(o);
-      });
-      selClr.addEventListener('change',e=>{
-        r.color=e.target.value; render(); persist(r); renderLeaderboard();
-      });
+      [{v:'normal',t:'通常'}, {v:'gray',t:'完了'}].forEach(p=>{const o=document.createElement('option');o.value=p.v;o.textContent=p.t;if((r.color||'normal')===p.v)o.selected=true;selClr.appendChild(o);});
+      selClr.addEventListener('change',e=>{r.color=e.target.value; renderProgress(); persist(r); renderLeaderboard();});
       tdClr.appendChild(selClr);
 
       tr.appendChild(tdDate); tr.appendChild(tdType); tr.appendChild(tdGoal);
@@ -323,45 +322,97 @@
       tb.appendChild(tr);
     });
 
-    const t = new Date();
-    $('#todayBanner').textContent = `本日: ${t.getMonth()+1}月${t.getDate()}日(${jpWeek(t)})`;
+    const t=new Date(); $('#todayBanner').textContent=`本日: ${t.getMonth()+1}月${t.getDate()}日(${jpWeek(t)})`;
     renderLeaderboard();
   }
-
-  function persist(rec){
-    const i=rows.findIndex(x=>x.date===rec.date);
-    if(i>=0) rows[i]=rec; else rows.push(rec);
-  }
-
   function scrollTodayIntoView(){
-    const scroller = $('#scroller');
-    const thead = scroller.querySelector('thead');
-    const todayRow = scroller.querySelector('tr.today') || scroller.querySelector('tbody tr');
-    if(!todayRow) return;
-    const headerH = thead.getBoundingClientRect().height;
-    const rowTop = todayRow.offsetTop;
-    scroller.scrollTo({ top: Math.max(0, rowTop - headerH - 4), behavior: 'smooth' });
+    const scroller=$('#scroller'); const thead=scroller.querySelector('thead');
+    const todayRow=scroller.querySelector('tr.today')||scroller.querySelector('tbody tr'); if(!todayRow) return;
+    const headerH=thead.getBoundingClientRect().height; const rowTop=todayRow.offsetTop;
+    scroller.scrollTo({top:Math.max(0,rowTop-headerH-4),behavior:'smooth'});
   }
 
-  // 名前読み込み
-  (function initName(){
-    const saved = localStorage.getItem(NAME_KEY);
-    if(saved) $('#displayName').value = saved;
-  })();
+  /* ========= クラスメイトページ ========= */
+  const MOTIVATION = [
+    (n)=>`${n}、きのうの自分を今日ちょっとだけ超えよう。`,
+    (n)=>`${n}、まず5分やろ。始めたら勝ちだよ。`,
+    (n)=>`${n}、世界史は“量×継続”。今の1ページが効いてくる。`,
+    (n)=>`${n}、今日は8割の精度じゃなくて“手数”重視でいこ。`,
+    (n)=>`${n}、復習は裏切らない。昨日触ったところをもう一度。`,
+    (n)=>`${n}、集中は波。短く刻んで何本も作ろう。`,
+    (n)=>`${n}、完了に変えるクリック、あれが自信になる。`,
+    (n)=>`${n}、YouTube宣言も強い。30秒で“やるモード”！`,
+    (n)=>`${n}、まず1問。身体を“勉強中の姿勢”にしよう。`,
+    (n)=>`${n}、できた量を見える化しよう。ゼロはだめ、1を作ろう。`
+  ];
+  function buildClassroom(){
+    const meName=($('#displayName').value||'あなた').trim();
+    const desks=$('#desks'); desks.innerHTML='';
+    // 並び：あなた + 5人 = 6席（2行×3列）
+    const names=[meName, ...classmates];
+    names.forEach((name,idx)=>{
+      const d=document.createElement('div'); d.className='desk';
+      d.innerHTML=`<div class="bubble" id="bubble-${idx}"></div>
+                   <div class="name">${name}</div>
+                   <div class="role">${idx===0?'（あなた）':'クラスメイト'}</div>`;
+      desks.appendChild(d);
+    });
+  }
+  function randomSay(){
+    const meName=($('#displayName').value||'あなた').trim();
+    const count=1+classmates.length; // 6
+    const who=Math.floor(Math.random()*count); // 0〜5
+    const bubble=$(`#bubble-${who}`); if(!bubble) return;
+    const say=MOTIVATION[Math.floor(Math.random()*MOTIVATION.length)](meName);
+    bubble.textContent=say;
+    bubble.classList.add('show');
+    setTimeout(()=>bubble.classList.remove('show'), 3500);
+  }
 
-  // イベント
-  $('#saveName').addEventListener('click',()=>{ localStorage.setItem(NAME_KEY, ($('#displayName').value||'あなた').trim()); renderLeaderboard(); });
-  $('#prev').addEventListener('click',()=>{ month-=1; if(month<0){month=11;year-=1;} load(); render(); setTimeout(scrollTodayIntoView, 50); });
-  $('#next').addEventListener('click',()=>{ month+=1; if(month>11){month=0;year+=1;} load(); render(); setTimeout(scrollTodayIntoView, 50); });
+  /* ========= タブ切替 ========= */
+  function showPage(which){
+    const p1=$('#pageProgress'), p2=$('#pageClass');
+    const t1=$('#tabProgress'), t2=$('#tabClass');
+    const is1=(which==='progress');
+    p1.style.display=is1?'block':'none';
+    p2.style.display=is1?'none':'block';
+    t1.classList.toggle('active', is1);
+    t2.classList.toggle('active', !is1);
+    if(is1){
+      renderProgress();
+      setTimeout(scrollTodayIntoView, 80);
+    }else{
+      buildClassroom();
+    }
+  }
+
+  /* ========= イベント ========= */
+  // 名前
+  (function initName(){
+    const saved=localStorage.getItem(NAME_KEY);
+    if(saved) $('#displayName').value=saved;
+  })();
+  $('#saveName').addEventListener('click',()=>{ localStorage.setItem(NAME_KEY, ($('#displayName').value||'あなた').trim()); buildClassroom(); renderLeaderboard(); });
+
+  // タブ
+  $('#tabProgress').addEventListener('click',()=>showPage('progress'));
+  $('#tabClass').addEventListener('click',()=>showPage('class'));
+
+  // 進捗ページ操作
+  $('#prev').addEventListener('click',()=>{ month-=1; if(month<0){month=11;year-=1;} load(); renderProgress(); setTimeout(scrollTodayIntoView,50); });
+  $('#next').addEventListener('click',()=>{ month+=1; if(month>11){month=0;year+=1;} load(); renderProgress(); setTimeout(scrollTodayIntoView,50); });
   $('#save').addEventListener('click',save);
-  $('#load').addEventListener('click',()=>{ const ok=load(); render(); setTimeout(scrollTodayIntoView, 50); alert(ok?'読み込みました':'保存データが見つかりません'); });
+  $('#load').addEventListener('click',()=>{ const ok=load(); renderProgress(); setTimeout(scrollTodayIntoView,50); alert(ok?'読み込みました':'保存データが見つかりません'); });
   $('#todayBtn').addEventListener('click',scrollTodayIntoView);
   $('#fabTop').addEventListener('click',scrollTodayIntoView);
   $('#fabBottom').addEventListener('click',scrollTodayIntoView);
 
-  // 初期描画
-  load(); render();
-  window.addEventListener('load', ()=> setTimeout(scrollTodayIntoView, 80));
+  // クラスメイトページ
+  $('#sayBtn').addEventListener('click',randomSay);
+
+  // 初期描画＝進捗ページ
+  load(); renderProgress();
+  window.addEventListener('load', ()=> setTimeout(scrollTodayIntoView,80));
 })();
 </script>
 </body>
