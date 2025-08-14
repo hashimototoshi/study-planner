@@ -241,7 +241,6 @@
 
   /* ========== 小ユーティリティ ========== */
   const $=sel=>document.querySelector(sel);
-  const monthKey = ()=>`${KEY}:${year}-${String(month+1).padStart(2,'0')}`; // ★ 追加: 月キー関数
   const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   const fromYmd=s=>{const [y,m,d]=s.split('-').map(Number); return new Date(y, m-1, d);};
   const jpWeek=d=>'日月火水木金土'[d.getDay()];
@@ -253,40 +252,22 @@
     need.forEach(d=>{ if(!have.has(d)) rows.push({date:d, type:'学習', goal:'', result:'', review:'', color:'normal'}); });
     rows.sort((a,b)=>a.date.localeCompare(b.date));
   }
-
-  /* ========== 自動保存（即時/遅延） ========== */
-  const AutoSave = {
-    t:null,
-    now(){
-      try{
-        const data=rows.filter(r=>fromYmd(r.date).getMonth()===month && fromYmd(r.date).getFullYear()===year);
-        localStorage.setItem(monthKey(), JSON.stringify(data));
-      }catch(e){
-        console.warn('保存に失敗しました', e);
-      }
-    },
-    later(){
-      if(this.t) clearTimeout(this.t);
-      this.t = setTimeout(()=>this.now(), 300);
-    }
-  };
-
-  function persist(rec){
-    const i=rows.findIndex(x=>x.date===rec.date);
-    if(i>=0) rows[i]=rec; else rows.push(rec);
-    AutoSave.later(); // ★ 追加: 変更毎に遅延セーブ
-  }
+  function persist(rec){const i=rows.findIndex(x=>x.date===rec.date); if(i>=0) rows[i]=rec; else rows.push(rec);}
 
   /* ========== ローカル保存/読込 ========== */
   function save(){
     pushHistory();
-    AutoSave.now(); // ★ 変更: セーブボタンは即時保存
+    const key=`${KEY}:${year}-${String(month+1).padStart(2,'0')}`;
+    const data=rows.filter(r=>fromYmd(r.date).getMonth()===month && fromYmd(r.date).getFullYear()===year);
+    localStorage.setItem(key, JSON.stringify(data));
     alert('更新しました（この端末のブラウザ内）');
     renderRank();
+    // 保存後も今日へ
     scrollTodayIntoView();
   }
   function load(){
-    const raw=localStorage.getItem(monthKey());
+    const key=`${KEY}:${year}-${String(month+1).padStart(2,'0')}`;
+    const raw=localStorage.getItem(key);
     if(!raw) return false;
     try{
       const data=JSON.parse(raw)||[];
@@ -323,22 +304,17 @@
 
       const tdGoal=document.createElement('td'); tdGoal.className='medium padL';
       const inGoal=document.createElement('input'); inGoal.type='text'; inGoal.placeholder='例：世界史 23〜24';
-      inGoal.value=r.goal||'';
-      // ★ 入力を確実に保持：input/change/blur で保存
-      ['input','change','blur'].forEach(ev=>inGoal.addEventListener(ev,e=>{ if(r.goal===e.target.value) return; pushHistory(); r.goal=e.target.value; persist(r); }));
-
+      inGoal.value=r.goal||''; inGoal.addEventListener('input',e=>{ pushHistory(); r.goal=e.target.value; persist(r); });
       tdGoal.appendChild(inGoal);
 
       const tdRes=document.createElement('td'); tdRes.className='medium padL';
       const inRes=document.createElement('input'); inRes.type='text'; inRes.placeholder='実績';
-      inRes.value=r.result||'';
-      ['input','change','blur'].forEach(ev=>inRes.addEventListener(ev,e=>{ if(r.result===e.target.value) return; pushHistory(); r.result=e.target.value; persist(r); }));
+      inRes.value=r.result||''; inRes.addEventListener('input',e=>{ pushHistory(); r.result=e.target.value; persist(r); });
       tdRes.appendChild(inRes);
 
       const tdRev=document.createElement('td'); tdRev.className='medium padL';
       const inRev=document.createElement('input'); inRev.type='text'; inRev.placeholder='復習範囲';
-      inRev.value=r.review||'';
-      ['input','change','blur'].forEach(ev=>inRev.addEventListener(ev,e=>{ if(r.review===e.target.value) return; pushHistory(); r.review=e.target.value; persist(r); }));
+      inRev.value=r.review||''; inRev.addEventListener('input',e=>{ pushHistory(); r.review=e.target.value; persist(r); });
       tdRev.appendChild(inRev);
 
       const tdClr=document.createElement('td'); tdClr.className='small padL';
@@ -359,6 +335,7 @@
     const t=new Date();
     $('#todayBanner').textContent=`本日: ${t.getMonth()+1}月${t.getDate()}日(${jpWeek(t)})`;
 
+    // ★毎回、今日の行をヘッダ直下にスクロール
     scrollTodayIntoView();
   }
 
@@ -725,14 +702,11 @@
     // 旧キー移行
     const keyOld=`studyplanner.v14.ocr:${year}-${String(month+1).padStart(2,'0')}`;
     const rawOld=localStorage.getItem(keyOld);
-    if(rawOld && !localStorage.getItem(monthKey())){
-      try{ localStorage.setItem(monthKey(), rawOld); }catch{}
+    if(rawOld && !localStorage.getItem(`${KEY}:${year}-${String(month+1).padStart(2,'0')}`)){
+      try{ localStorage.setItem(`${KEY}:${year}-${String(month+1).padStart(2,'0')}`, rawOld); }catch{}
     }
     load(); renderProgress(); document.body.classList.add('compact'); renderRank();
-
-    // ★ ページ離脱前に最終保存
-    window.addEventListener('beforeunload', ()=>{ try{ AutoSave.now(); }catch(_){ } });
-
+    // 初回も今日へ
     setTimeout(scrollTodayIntoView,0);
   })();
 
