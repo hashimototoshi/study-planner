@@ -254,26 +254,6 @@
   }
   function persist(rec){const i=rows.findIndex(x=>x.date===rec.date); if(i>=0) rows[i]=rec; else rows.push(rec);}
 
-  /* ===== 取込診断ユーティリティ ===== */
-  const DIAG_MAX_EXAMPLES = 10;
-  let _issues = [];
-  function diagReset(){ _issues = []; }
-  function diagIssue(code, msg, ctx){ _issues.push({code, msg, ctx}); }
-  function diagReport(applied, modeLabel){
-    if(!_issues.length){
-      alert(`${modeLabel}：${applied}件 反映しました`);
-      return;
-    }
-    const counts = _issues.reduce((m,i)=>{ m[i.code]=(m[i.code]||0)+1; return m; }, {});
-    const head = `${modeLabel}：${applied}件 反映（警告/スキップ ${_issues.length}件）`;
-    const lines = Object.entries(counts).map(([k,v])=>`・${k}: ${v}件`);
-    const samples = _issues.slice(0, DIAG_MAX_EXAMPLES).map((i,idx)=>
-      `${idx+1}. [${i.code}] ${i.msg}${i.ctx?` → ${i.ctx}`:''}`
-    );
-    alert(head + '\n\n理由内訳:\n' + lines.join('\n') + '\n\n例:\n' + samples.join('\n') +
-          '\n\n※見出し（日付/種別/目標/結果/復習）、日付表記（8/14 など）、空欄/空行を確認してください。');
-  }
-
   /* ========== ローカル保存/読込 ========== */
   function save(){
     pushHistory();
@@ -282,6 +262,7 @@
     localStorage.setItem(key, JSON.stringify(data));
     alert('更新しました（この端末のブラウザ内）');
     renderRank();
+    // 保存後も今日へ
     scrollTodayIntoView();
   }
   function load(){
@@ -353,6 +334,8 @@
 
     const t=new Date();
     $('#todayBanner').textContent=`本日: ${t.getMonth()+1}月${t.getDate()}日(${jpWeek(t)})`;
+
+    // ★毎回、今日の行をヘッダ直下にスクロール
     scrollTodayIntoView();
   }
 
@@ -394,17 +377,16 @@
     let applied=0;
     for(const ln of lines){
       const parts = ln.split(/[\s,　\t]+/).filter(Boolean);
-      if(parts.length<2){ diagIssue('LINE_SHORT','要素数が足りません', ln); continue; }
-      const dtk = normalizeDateToken(parts[0]); if(!dtk){ diagIssue('DATE_PARSE','日付を読めません', parts[0]); continue; }
+      if(parts.length<2) continue;
+      const dtk = normalizeDateToken(parts[0]); if(!dtk) continue;
       let typ = parts[1].replace(/\s/g,'').trim();
       if(typ==='休み') typ='休日';
-      if(!/^(学習|休日|復習)$/.test(typ)){ diagIssue('TYPE_INVALID','種別が不正（学習/休日/復習）', typ); continue; }
+      if(!/^(学習|休日|復習)$/.test(typ)) continue;
 
-      if(dtk.y!==year || dtk.mo!==month){ diagIssue('MONTH_MISMATCH','表示中の月ではないためスキップ', `${dtk.y}/${dtk.mo+1}`); continue; }
+      if(dtk.y!==year || dtk.mo!==month) continue;
       const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
       const rec = rows.find(x=>x.date===ds);
       if(rec){ pushHistory(); rec.type=typ; persist(rec); applied++; }
-      else { diagIssue('NO_ROW','当月テーブルに該当日が見つからない', ds); }
     }
     return applied;
   }
@@ -432,22 +414,18 @@
       if(/結果/.test(h)) col.result=h;
       if(/復習/.test(h)) col.review=h;
     });
-    if(!col.date || !col.type){
-      diagIssue('HEADER_MISSING','CSVの見出しが不足（少なくとも日付・種別が必要）', header.join(','));
-      return 0;
-    }
+    if(!col.date || !col.type){ alert('CSV見出しを確認してください（少なくとも「日付」「種別」）'); return 0; }
     let applied=0;
     for(const o of objs){
-      const rawDate = o[col.date];
-      const dtk = normalizeDateToken(rawDate); if(!dtk){ diagIssue('DATE_PARSE','日付を読めません', String(rawDate)); continue; }
-      if(dtk.y!==year || dtk.mo!==month){ diagIssue('MONTH_MISMATCH','表示中の月ではないためスキップ', `${dtk.y}/${dtk.mo+1}`); continue; }
+      const dtk = normalizeDateToken(o[col.date]); if(!dtk) continue;
+      if(dtk.y!==year || dtk.mo!==month) continue;
       const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
-      const rec = rows.find(x=>x.date===ds); if(!rec){ diagIssue('NO_ROW','当月テーブルに該当日が見つからない', ds); continue; }
+      const rec = rows.find(x=>x.date===ds);
+      if(!rec) continue;
 
       let t = clean(o[col.type]);
       if(t==='休み') t='休日';
       if(/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; }
-      else { diagIssue('TYPE_INVALID','種別は 学習/休日/復習 のいずれか', String(o[col.type])); }
 
       if(col.goal   !== undefined) rec.goal   = clean(o[col.goal]);
       if(col.result !== undefined) rec.result = clean(o[col.result]);
@@ -458,86 +436,40 @@
     return applied;
   }
 
-  // ▼▼▼ ここから：縦一列ブロックのズレ修正版 ▼▼▼
   function looksLikeColumnBlocks(text){
-    // 空行は消さない（重要）
-    const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim());
+    const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
     if (L.length < 12) return false;
     const i = L.findIndex(s => s.includes('日付'));
     if (i < 0 || i + 4 >= L.length) return false;
     const head = L.slice(i, i+5);
     const need = ['日付','種別','目標','結果','復習'];
     if (!need.every((w,idx)=> (head[idx]||'').includes(w))) return false;
-    const after = L.slice(i+5);
-    return after.some(s => /^\d{1,2}\s*(?:[\/\-]|月)\s*\d{1,2}/.test(s) || /^\d{4}-\d{2}-\d{2}$/.test(s));
+    return L.slice(i+5).some(s => /^\d{1,2}[\/\-月]\d{1,2}/.test(s) || /^\d{4}-\d{2}-\d{2}$/.test(s));
   }
-
   function parseColumnBlocks(text){
-    const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim()); // 空行保持
+    const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
     const i = L.findIndex(s => s.includes('日付'));
     const data = L.slice(i+5);
 
     const rows = [];
-    let block = null;       // {日付, 種別, 目標, 結果, 復習}
-    let ptr = 0;            // 0:日付 1:種別 2:目標 3:結果 4:復習
-    const expect = ['日付','種別','目標','結果','復習'];
-
-    const pushFilled = (reason)=>{
-      if(!block) return;
-      if(block['日付']){
-        // 欠けている欄を空文字で補完（自己修復）
-        for(const k of expect){ if(block[k] == null) block[k] = ''; }
-        rows.push(block);
-        if(reason) diagIssue('COLUMN_MISALIGN', reason, `日付=${block['日付']}`);
-      }
-      block = null; ptr = 0;
-    };
-
-    const isDateLine = (s) => /^\d{1,2}\s*(?:[\/\-]|月)\s*\d{1,2}/.test(s) || /^\d{4}-\d{2}-\d{2}$/.test(s);
-
+    let block = {};
+    let ptr = 0; // 0日付 1種別 2目標 3結果 4復習
     for (const line of data){
-      // 新しい日付が来たら、未完ブロックを確定 → 新規開始
-      if (isDateLine(line)){
-        if (block && ptr !== 0 && ptr < 5){
-          pushFilled(`項目が不足（受取${ptr}/期待5）。空欄として補完しました`);
-        }
-        block = {'日付': line}; ptr = 1;
-        continue;
-      }
-
-      // 空行は「空欄値」として解釈（ズレ防止）
-      if (line === ''){
-        if (block && ptr > 0 && ptr < 5){
-          block[ expect[ptr] ] = ''; ptr++;
-        }
-        continue;
-      }
-
-      // 見出し語はスキップ
       if (['日付','種別','目標','結果','復習'].includes(line)) continue;
-
-      // 想定外の文字列が最初に来た場合は診断のみ
-      if (!block){
-        diagIssue('UNEXPECTED_LINE','見出し後に想定外の行', line);
-        continue;
-      }
-
-      block[ expect[ptr] ] = line; ptr++;
-
-      // 5項目そろったら確定
-      if (ptr === 5){
-        pushFilled();
-      }
+      if (ptr === 0){ block={}; block['日付']=line; ptr=1; continue; }
+      if (ptr === 1){ block['種別']=line; ptr=2; continue; }
+      if (ptr === 2){ block['目標']=line; ptr=3; continue; }
+      if (ptr === 3){ block['結果']=line; ptr=4; continue; }
+      if (ptr === 4){ block['復習']=line; rows.push(block); ptr=0; continue; }
     }
-    // 末尾に未完がいれば確定（補完）
-    if (block && ptr !== 0 && ptr < 5){
-      pushFilled(`末尾で項目不足（受取${ptr}/期待5）。空欄として補完しました`);
+    if (ptr !== 0){
+      block['目標'] = block['目標'] ?? '';
+      block['結果'] = block['結果'] ?? '';
+      block['復習'] = block['復習'] ?? '';
+      rows.push(block);
     }
-
     return { header:['日付','種別','目標','結果','復習'], rows };
   }
-  // ▲▲▲ ここまで：縦一列ブロックのズレ修正版 ▲▲▲
-
   function importAnyText(text){
     try{
       const n = importCsvText(text);
@@ -548,17 +480,14 @@
       let applied=0;
       const col = {date:'日付', type:'種別', goal:'目標', result:'結果', review:'復習'};
       for (const o of parsed.rows){
-        const rawDate = o[col.date];
-        const dtk = normalizeDateToken(rawDate);
-        if(!dtk){ diagIssue('DATE_PARSE','日付を読めません', String(rawDate)); continue; }
-        if (dtk.y !== year || dtk.mo !== month){ diagIssue('MONTH_MISMATCH','表示中の月ではないためスキップ', `${dtk.y}/${dtk.mo+1}`); continue; }
+        const dtk = normalizeDateToken(o[col.date]); if(!dtk) continue;
+        if (dtk.y !== year || dtk.mo !== month) continue;
         const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
-        const rec = rows.find(x=>x.date===ds); if(!rec){ diagIssue('NO_ROW','当月テーブルに該当日が見つからない', ds); continue; }
+        const rec = rows.find(x=>x.date===ds); if(!rec) continue;
 
         let t = clean(o[col.type]);
         if (t==='休み') t='休日';
         if (/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; }
-        else if (t) { diagIssue('TYPE_INVALID','種別が不正（学習/休日/復習）', t); }
 
         rec.goal   = clean(o[col.goal]);
         rec.result = clean(o[col.result]);
@@ -568,7 +497,6 @@
       }
       return applied;
     }
-    diagIssue('FORMAT_UNKNOWN','CSVでも縦一列形式でもありません', (text||'').slice(0,64));
     return 0;
   }
 
@@ -667,7 +595,7 @@
   // ページ切替
   function showPage(which){
     const p1=$('#pageProgress'), p2=$('#pageClass'), p3=$('#pageRank');
-    const t1=$('#tabProgress'), t2=$('#tabClass'), t3=$('#tabRank']);
+    const t1=$('#tabProgress'), t2=$('#tabClass'), t3=$('#tabRank');
     const show = (a,b)=>{ a.style.display='block'; b.forEach(x=>x.style.display='none'); };
     if(which==='progress'){ show(p1,[p2,p3]); t1.classList.add('active'); t2.classList.remove('active'); t3.classList.remove('active'); renderProgress(); }
     if(which==='class'){    show(p2,[p1,p3]); t2.classList.add('active'); t1.classList.remove('active'); t3.classList.remove('active'); buildClassroom(); }
@@ -702,10 +630,9 @@
     const text = prompt('日付と種別の一覧や、縦一列の表を貼り付け（例: 8/13(日) 休日 など）');
     if(!text) return;
     pushHistory();
-    diagReset();
     const n = parseTypeImport(text) || importAnyText(text);
     renderProgress(); renderRank();
-    diagReport(n, '貼り付け取込');
+    alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした（見出し・月・書式を確認）');
   });
 
   // 取込（ファイル）
@@ -713,10 +640,9 @@
     const f=e.target.files?.[0]; if(!f) return;
     const txt=await f.text();
     pushHistory();
-    diagReset();
     const n= importAnyText(txt);
     renderProgress(); renderRank();
-    diagReport(n, 'ファイル取込');
+    alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした（見出し・当月か要確認）');
     e.target.value='';
   });
 
@@ -726,10 +652,9 @@
     try{
       const text = await ocrImage(f);
       pushHistory();
-      diagReset();
       const n = importAnyText(text) || parseTypeImport(text||'');
       renderProgress(); renderRank();
-      diagReport(n, 'OCR取込');
+      alert(n?`OCR取込で当月に ${n} 件反映しました`:'文字が認識できないか、当月データが見つかりませんでした');
     }catch(err){
       alert('OCRに失敗しました。画像の鮮明さ・照明・傾きを確認してください。');
     }finally{
@@ -741,7 +666,7 @@
   $('#undoP').onclick = $('#undoC').onclick = $('#undoT').onclick = ()=>{ undo(); setTimeout(scrollTodayIntoView,0); };
   $('#redoP').onclick = $('#redoC').onclick = $('#redoT').onclick = ()=>{ redo(); setTimeout(scrollTodayIntoView,0); };
   $('#wipeP').onclick = ()=>{ if(confirm('当月の進捗を初期化します。よろしいですか？')){ pushHistory(); monthDates(year,month).forEach(ds=>{ const r=rows.find(x=>x.date===ds); if(r){ r.type='学習'; r.goal=''; r.result=''; r.review=''; r.color='normal'; persist(r);} }); renderProgress(); renderRank(); } };
-  $('#wipeC').onclick = ()=>{ if(confirm('Cページの発話状態をリセットしますか？')){ /* 参照変数が未定義の場合は無視 */ try{ recentLines.length=0; lastSpeaker.name=null; }catch(_){} buildClassroom(); } };
+  $('#wipeC').onclick = ()=>{ if(confirm('Cページの発話状態をリセットしますか？')){ recentLines.length=0; lastSpeaker.name=null; buildClassroom(); } };
   $('#wipeT').onclick = ()=>{ if(confirm('ランキング表示を再計算しますか？')){ renderRank(); } };
 
   // 🐹＝ホーム＆今日へ
@@ -781,6 +706,7 @@
       try{ localStorage.setItem(`${KEY}:${year}-${String(month+1).padStart(2,'0')}`, rawOld); }catch{}
     }
     load(); renderProgress(); document.body.classList.add('compact'); renderRank();
+    // 初回も今日へ
     setTimeout(scrollTodayIntoView,0);
   })();
 
