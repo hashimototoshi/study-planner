@@ -345,6 +345,8 @@
   }
 
   /* ========== 取り込み：貼付 / CSV/TSV / OCR ========== */
+
+  // 日付トークン正規化
   function normalizeDateToken(raw){
     if(!raw) return null;
     raw = String(raw).trim();
@@ -360,6 +362,7 @@
     return {y,mo,d};
   }
 
+  // 空欄/NaN/null/undefined を空文字に正規化
   function clean(v){
     const s = String(v ?? '').trim();
     if(!s) return '';
@@ -367,6 +370,7 @@
     return s;
   }
 
+  // 例: "8/13(日) 休日" の貼り付け
   function parseTypeImport(text){
     const lines = (text||'').replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
     let applied=0;
@@ -386,21 +390,59 @@
     return applied;
   }
 
-  function parseDelimited(text){
-    if(text.charCodeAt(0)===0xFEFF) text = text.slice(1);
-    const sep = (text.indexOf('\t')!==-1) ? '\t' : ',';
-    const lines = text.replace(/\r\n?/g,'\n').split('\n').filter(l=>l.trim()!=='');
-    const header = lines[0].split(sep).map(s=>s.trim());
-    const rows = lines.slice(1).map(line=>{
-      const cells = line.split(sep);
-      const obj = {}; header.forEach((h,i)=> obj[h] = (cells[i]??'').trim());
-      return obj;
-    });
-    return {header, rows};
+  /* ======= RFC4180準拠のCSV/TSVパーサ（クォート対応・空欄保持） ======= */
+  function splitRFC4180(line, sep){
+    const out=[]; let cur=''; let inQ=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(inQ){
+        if(ch==='\"'){
+          if(i+1<line.length && line[i+1]==='\"'){ cur+='\"'; i++; }
+          else{ inQ=false; }
+        }else{
+          cur+=ch;
+        }
+      }else{
+        if(ch==='\"'){ inQ=true; }
+        else if(ch===sep){ out.push(cur); cur=''; }
+        else{ cur+=ch; }
+      }
+    }
+    out.push(cur);
+    return out;
   }
 
+  function parseDelimited(text){
+    if(!text) return {header:[], rows:[]};
+    if(text.charCodeAt(0)===0xFEFF) text = text.slice(1);           // BOM除去
+    const raw = text.replace(/\r\n?/g,'\n');
+    // 行頭に「日付」「種別」等が縦一列で並ぶ場合は後段の縦一列パーサに任せる
+    // ここでは純粋なCSV/TSVだけ扱う
+    const lines = raw.split('\n');
+    // セパレータ判定：タブ優先、なければカンマ
+    const sepChar = (raw.indexOf('\t')!==-1) ? '\t' : ',';
+
+    // 空行も保持して行数を合わせる（後でfilterしない）
+    const headerLine = lines[0] ?? '';
+    const headerCells = splitRFC4180(headerLine, sepChar).map(s=>s.trim());
+    const body = lines.slice(1).map(line=>{
+      const cells = splitRFC4180(line, sepChar);
+      const obj = {};
+      headerCells.forEach((h,idx)=>{
+        const v = (cells[idx]!==undefined) ? cells[idx] : '';
+        obj[h] = String(v).trim();
+      });
+      return obj;
+    });
+    // 末尾の完全空レコードは除去
+    const rows = body.filter(o=> Object.values(o).some(v=>String(v).trim()!==''));
+    return {header: headerCells, rows};
+  }
+
+  // CSV取込（ヘッダ名で列同定。順番は自由。空欄でも上書き。）
   function importCsvText(text){
     const {header, rows:objs} = parseDelimited(text);
+    if(!header.length) return 0;
     const col = {};
     header.forEach(h=>{
       if(/日付/.test(h)) col.date=h;
@@ -410,6 +452,7 @@
       if(/復習/.test(h)) col.review=h;
     });
     if(!col.date || !col.type){ alert('CSV見出しを確認してください（少なくとも「日付」「種別」）'); return 0; }
+
     let applied=0;
     for(const o of objs){
       const dtk = normalizeDateToken(o[col.date]); if(!dtk) continue;
@@ -422,7 +465,7 @@
       if(t==='休み') t='休日';
       if(/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; }
 
-      // 「列が存在するなら空でも上書き」←重要
+      // 「列が存在するなら空でも上書き」
       if(col.goal   !== undefined) rec.goal   = clean(o[col.goal]);
       if(col.result !== undefined) rec.result = clean(o[col.result]);
       if(col.review !== undefined) rec.review = clean(o[col.review]);
@@ -432,28 +475,27 @@
     return applied;
   }
 
-  /* ====== 縦一列フォーマット対応（追加） ====== */
+  /* ====== 縦一列フォーマット対応 ====== */
   function looksLikeColumnBlocks(text){
-    const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
-    if (L.length < 12) return false;
-    const i = L.findIndex(s => s.includes('日付'));
-    if (i < 0 || i + 4 >= L.length) return false;
-    const head = L.slice(i, i+5);
+    const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim());
+    // 空行もある前提で、必要見出しの並びを検知
+    const i = L.findIndex(s => /日付/.test(s));
+    if (i < 0) return false;
     const need = ['日付','種別','目標','結果','復習'];
-    if (!need.every((w,idx)=> (head[idx]||'').includes(w))) return false;
-    return L.slice(i+5).some(s => /^\d{1,2}[\/\-月]\d{1,2}/.test(s) || /^\d{4}-\d{2}-\d{2}$/.test(s));
+    for(let k=0;k<need.length;k++){
+      if(!((L[i+k]||'').includes(need[k]))) return false;
+    }
+    return true;
   }
   function parseColumnBlocks(text){
-    const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
-    const i = L.findIndex(s => s.includes('日付'));
-    const header = L.slice(i, i+5).map(s=>s.replace(/\s/g,''));
-    const data = L.slice(i+5);
-
+    const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim());
+    const i = L.findIndex(s => /日付/.test(s));
+    const data = L.slice(i+5); // ヘッダ5行の後から
     const rows = [];
     let block = {};
     let ptr = 0; // 0日付 1種別 2目標 3結果 4復習
     for (const line of data){
-      if (['日付','種別','目標','結果','復習'].includes(line)) continue;
+      if(line==='') continue; // 空行スキップ（縦一列は空行が混じりやすい）
       if (ptr === 0){ block={}; block['日付']=line; ptr=1; continue; }
       if (ptr === 1){ block['種別']=line; ptr=2; continue; }
       if (ptr === 2){ block['目標']=line; ptr=3; continue; }
@@ -468,34 +510,38 @@
     }
     return { header:['日付','種別','目標','結果','復習'], rows };
   }
+
+  // どの形式でも受け取る統合入口
   function importAnyText(text){
+    // 1) 通常CSV/TSV（クォート対応）
     try{
       const n = importCsvText(text);
       if (n>0) return n;
     }catch(_){}
+    // 2) 縦一列（「日付」「種別」…と列名が縦並び）
     if (looksLikeColumnBlocks(text)){
       const parsed = parseColumnBlocks(text);
       let applied=0;
-      const col = {date:'日付', type:'種別', goal:'目標', result:'結果', review:'復習'};
       for (const o of parsed.rows){
-        const dtk = normalizeDateToken(o[col.date]); if(!dtk) continue;
+        const dtk = normalizeDateToken(o['日付']); if(!dtk) continue;
         if (dtk.y !== year || dtk.mo !== month) continue;
         const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
         const rec = rows.find(x=>x.date===ds); if(!rec) continue;
 
-        let t = clean(o[col.type]);
+        let t = clean(o['種別']);
         if (t==='休み') t='休日';
         if (/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; }
 
-        rec.goal   = clean(o[col.goal]);
-        rec.result = clean(o[col.result]);
-        rec.review = clean(o[col.review]);
+        rec.goal   = clean(o['目標']);
+        rec.result = clean(o['結果']);
+        rec.review = clean(o['復習']);
 
         persist(rec); applied++;
       }
       return applied;
     }
-    return 0;
+    // 3) 8/13 休日 のようなタイプ行
+    return parseTypeImport(text) || 0;
   }
 
   async function ocrImage(file){
@@ -693,8 +739,8 @@
 
   /* ========== タブ＆ページ ========== */
   function showPage(which){
-    const p1=$('#pageProgress'), p2=$('#pageClass'), p3=$('#pageRank');
-    const t1=$('#tabProgress'), t2=$('#tabClass'), t3=$('#tabRank');
+    const p1=$('#pageProgress'), p2=$('#pageClass'), p3=$('#pageRank']);
+    const t1=$('#tabProgress'), t2=$('#tabClass'), t3=$('#tabRank']);
     const show = (a,b)=>{ a.style.display='block'; b.forEach(x=>x.style.display='none'); };
     if(which==='progress'){ show(p1,[p2,p3]); t1.classList.add('active'); t2.classList.remove('active'); t3.classList.remove('active'); renderProgress(); }
     if(which==='class'){    show(p2,[p1,p3]); t2.classList.add('active'); t1.classList.remove('active'); t3.classList.remove('active'); buildClassroom(); }
@@ -737,23 +783,24 @@
     showPage(PAGES[ni]);
   });
 
+  // 月移動/保存など
   $('#prev').addEventListener('click',()=>{ pushHistory(); month-=1; if(month<0){month=11;year-=1;} load(); renderProgress(); renderRank(); });
   $('#next').addEventListener('click',()=>{ pushHistory(); month+=1; if(month>11){month=0;year+=1;} load(); renderProgress(); renderRank(); });
   $('#save').addEventListener('click',save);
   $('#load').addEventListener('click',()=>{ const ok=load(); renderProgress(); renderRank(); alert(ok?'読み込みました':'保存データが見つかりません'); });
   $('#toggleCompact').addEventListener('click',()=>{ document.body.classList.toggle('compact'); });
 
-  // 貼り付け取込：タイプ行（8/13 休日 等）＋縦一列CSVの両対応
+  // 貼り付け取込：タイプ行＋縦一列の両対応
   $('#importPaste').addEventListener('click',()=>{
     const text = prompt('日付と種別の一覧や、縦一列の表を貼り付け（例: 8/13(日) 休日 など）');
     if(!text) return;
     pushHistory();
-    const n = parseTypeImport(text) || importAnyText(text);
+    const n = importAnyText(text);
     renderProgress(); renderRank();
     alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした');
   });
 
-  // CSV/TSV/TXT取込：通常CSV→縦一列の順に自動判別
+  // CSV/TSV/TXT取込：通常CSV→縦一列→タイプ行の順で自動判別
   $('#importFile').addEventListener('change',async (e)=>{
     const f=e.target.files?.[0]; if(!f) return;
     const txt=await f.text();
@@ -764,13 +811,13 @@
     e.target.value='';
   });
 
-  // OCR取込：テキスト化→通常CSV or 縦一列 or タイプリストの順に試行
+  // OCR取込：テキスト化→自動判別
   $('#importImg').addEventListener('change',async (e)=>{
     const f=e.target.files?.[0]; if(!f) return;
     try{
       const text = await ocrImage(f);
       pushHistory();
-      const n = importAnyText(text) || parseTypeImport(text||'');
+      const n = importAnyText(text);
       renderProgress(); renderRank();
       alert(n?`OCR取込で当月に ${n} 件反映しました`:'文字が認識できないか、当月データが見つかりませんでした');
     }catch(err){
@@ -780,14 +827,17 @@
     }
   });
 
+  // ページ別：Undo/Redo/全削除
   $('#undoP').onclick = $('#undoC').onclick = $('#undoT').onclick = ()=>undo();
   $('#redoP').onclick = $('#redoC').onclick = $('#redoT').onclick = ()=>redo();
   $('#wipeP').onclick = ()=>{ if(confirm('当月の進捗を初期化します。よろしいですか？')){ pushHistory(); monthDates(year,month).forEach(ds=>{ const r=rows.find(x=>x.date===ds); if(r){ r.type='学習'; r.goal=''; r.result=''; r.review=''; r.color='normal'; persist(r);} }); renderProgress(); renderRank(); } };
   $('#wipeC').onclick = ()=>{ if(confirm('Cページの発話状態をリセットしますか？')){ recentLines.length=0; lastSpeaker.name=null; clearSpeechTimers(); buildClassroom(); } };
   $('#wipeT').onclick = ()=>{ if(confirm('ランキング表示を再計算しますか？')){ renderRank(); } };
 
+  // 右下🐹＝ホーム(進捗)
   $('#fabHome').addEventListener('click',()=> showPage('progress'));
 
+  // 初期表示
   (function init(){
     // 旧キー移行
     const keyOld=`studyplanner.v14.ocr:${year}-${String(month+1).padStart(2,'0')}`;
