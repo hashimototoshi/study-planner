@@ -16,13 +16,13 @@
     --header-bg:#ffffff; --header-shadow:0 6px 12px rgba(0,0,0,.06);
     --accent:#2563eb;
 
-    --male:#2563eb;
-    --female:#f97316;
+    --male:#2563eb;        /* 男性=青 */
+    --female:#f97316;      /* 女性=オレンジ */
 
     --bubble-gen-bg:#f4f8ff;   --bubble-gen-bd:#d6e6ff;
     --bubble-fam-bg:#fff9ec;   --bubble-fam-bd:#ffe5ad;
 
-    --scale: 1;
+    --scale: 1; /* 一覧スケール（1=標準, 0.72=詰め）*/
   }
   *{box-sizing:border-box}
   body{margin:0;padding:14px;font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",sans-serif;color:#111827;background:#fff}
@@ -220,7 +220,7 @@
   const KEY='studyplanner.v15.ocr';
   const NAME_KEY='studyplanner.displayName';
 
-  let year=(new Date()).getFullYear(), month=(new Date()).getMonth(); // 0=Jan, 7=Aug
+  let year=(new Date()).getFullYear(), month=(new Date()).getMonth();
   let rows=[]; // {date,type,goal,result,review,color}
 
   /* ========== Undo/Redo ========== */
@@ -332,47 +332,21 @@
     scroller.scrollTo({top:Math.max(0,rowTop-headerH-4)});
   }
 
-  /* ========== 取り込み：ユーティリティ ========== */
-
-  // CSV 1行を「引用対応」で分割
-  function splitCSV(line, sep=','){
-    const out=[]; let cur=''; let inQ=false;
-    for(let i=0;i<line.length;i++){
-      const ch=line[i];
-      if(ch === '"'){
-        if(inQ && line[i+1] === '"'){ cur+='"'; i++; }
-        else inQ = !inQ;
-      }else if(ch === sep && !inQ){
-        out.push(cur); cur='';
-      }else{
-        cur += ch;
-      }
-    }
-    out.push(cur);
-    return out;
-  }
-
-  // 日付トークンを厳密化：テキスト側の月を使う／曜日は捨てる／全角ダッシュ等を吸収
+  /* ========== 取り込み系共通 ========== */
   function normalizeDateToken(raw){
     if(!raw) return null;
-    raw = String(raw).replace(/\uFEFF/g,'').trim();
-    // ()や（）の中（曜日）を除去
-    raw = raw.replace(/[（(].*?[)）]/g,'').trim();
-    // 異体字ダッシュ等を正規化
-    raw = raw.replace(/[–—−]/g,'-').replace(/[．。]/g,'.');
-
-    // 例: 2025-08-14 / 2025/8/14 / 2025.8.14
-    let m = raw.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
-    if(m){ return { y:+m[1], mo:+m[2]-1, d:+m[3] }; }
-
-    // 例: 8/14 / 8-14 / 8月14
-    m = raw.match(/^(\d{1,2})[\/\-月\.](\d{1,2})$/);
-    if(m){ return { y:year, mo:+m[1]-1, d:+m[2] }; }
-
-    return null;
+    raw = String(raw).trim();
+    raw = raw.replace(/（.*?）|\(.*?\)/g,'').trim(); // 曜日カッコ除去
+    let y, mo, d;
+    let m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(m){ y=+m[1]; mo=+m[2]-1; d=+m[3]; }
+    else{
+      const m1 = raw.match(/^(\d{1,2})[\/\-月](\d{1,2})/);
+      if(!m1) return null;
+      y = year; mo = month; d = +m1[2];
+    }
+    return {y,mo,d};
   }
-
-  // 空っぽ/NaN/null/undefined → 空文字に
   function clean(v){
     const s = String(v ?? '').trim();
     if(!s) return '';
@@ -380,40 +354,33 @@
     return s;
   }
 
-  // 「8/13 休日」等の簡易リスト
   function parseTypeImport(text){
     const lines = (text||'').replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
     let applied=0;
     for(const ln of lines){
-      const parts = ln.split(/[\s,　\t]+/).filter(Boolean); // CSVっぽくてもここでは「種別だけ」更新
+      const parts = ln.split(/[\s,　\t]+/).filter(Boolean);
       if(parts.length<2) continue;
       const dtk = normalizeDateToken(parts[0]); if(!dtk) continue;
       let typ = parts[1].replace(/\s/g,'').trim();
       if(typ==='休み') typ='休日';
       if(!/^(学習|休日|復習)$/.test(typ)) continue;
 
-      // ★ テキスト側の月を尊重する
+      if(dtk.y!==year || dtk.mo!==month) continue; // 当月のみ
       const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
-      // 当月のみ反映（UIの月と一致したときに反映される）
-      if(dtk.y!==year || dtk.mo!==month) continue;
-
       const r = rows.find(x=>x.date===ds);
       if(r){ pushHistory(); r.type=typ; persist(r); applied++; }
     }
     return applied;
   }
 
-  // 区切りテキスト（CSV/TSV）
   function parseDelimited(text){
     if(text.charCodeAt(0)===0xFEFF) text = text.slice(1);
-    const hasTab = text.indexOf('\t')!==-1;
-    const sep = hasTab ? '\t' : ',';
+    const sep = (text.indexOf('\t')!==-1) ? '\t' : ',';
     const lines = text.replace(/\r\n?/g,'\n').split('\n').filter(l=>l.trim()!=='');
-    const header = (hasTab ? lines[0].split('\t') : splitCSV(lines[0], ',')).map(s=>s.trim());
+    const header = lines[0].split(sep).map(s=>s.trim());
     const rows = lines.slice(1).map(line=>{
-      const cells = hasTab ? line.split('\t') : splitCSV(line, ',');
-      const obj = {};
-      header.forEach((h,i)=> obj[h] = (cells[i]??'').trim());
+      const cells = line.split(sep);
+      const obj = {}; header.forEach((h,i)=> obj[h] = (cells[i]??'').trim());
       return obj;
     });
     return {header, rows};
@@ -429,16 +396,12 @@
       if(/結果/.test(h)) col.result=h;
       if(/復習/.test(h)) col.review=h;
     });
-    if(!col.date || !col.type){ return 0; }
-
+    if(!col.date || !col.type){ alert('CSV見出しを確認してください（少なくとも「日付」「種別」）'); return 0; }
     let applied=0;
     for(const o of objs){
       const dtk = normalizeDateToken(o[col.date]); if(!dtk) continue;
-      // ★ テキストの月を使ってキー化
-      const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
-      // 当月以外はスキップ（UIの月と一致しているか）
       if(dtk.y!==year || dtk.mo!==month) continue;
-
+      const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
       const rec = rows.find(x=>x.date===ds);
       if(!rec) continue;
 
@@ -446,7 +409,7 @@
       if(t==='休み') t='休日';
       if(/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; }
 
-      // 「列が存在するなら空でも上書き」
+      // 列が存在するなら空でも上書き
       if(col.goal   !== undefined) rec.goal   = clean(o[col.goal]);
       if(col.result !== undefined) rec.result = clean(o[col.result]);
       if(col.review !== undefined) rec.review = clean(o[col.review]);
@@ -465,7 +428,7 @@
     const head = L.slice(i, i+5);
     const need = ['日付','種別','目標','結果','復習'];
     if (!need.every((w,idx)=> (head[idx]||'').includes(w))) return false;
-    return L.slice(i+5).some(s => /^\d{1,2}[\/\-月]\d{1,2}/.test(s) || /^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(s));
+    return L.slice(i+5).some(s => /^\d{1,2}[\/\-月]\d{1,2}/.test(s) || /^\d{4}-\d{2}-\d{2}$/.test(s));
   }
   function parseColumnBlocks(text){
     const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
@@ -492,10 +455,9 @@
     return { header:['日付','種別','目標','結果','復習'], rows };
   }
   function importAnyText(text){
-    // まずは CSV/縦一列 を優先
     try{
-      const n1 = importCsvText(text);
-      if (n1>0) return n1;
+      const n = importCsvText(text);
+      if (n>0) return n;
     }catch(_){}
     if (looksLikeColumnBlocks(text)){
       const parsed = parseColumnBlocks(text);
@@ -503,8 +465,8 @@
       const col = {date:'日付', type:'種別', goal:'目標', result:'結果', review:'復習'};
       for (const o of parsed.rows){
         const dtk = normalizeDateToken(o[col.date]); if(!dtk) continue;
+        if (dtk.y !== year || dtk.mo !== month) continue;
         const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
-        if(dtk.y!==year || dtk.mo!==month) continue;
         const rec = rows.find(x=>x.date===ds); if(!rec) continue;
 
         let t = clean(o[col.type]);
@@ -517,13 +479,11 @@
 
         persist(rec); applied++;
       }
-      if(applied>0) return applied;
+      return applied;
     }
-    // ダメなら「8/13 休日」形式
-    return parseTypeImport(text);
+    return 0;
   }
 
-  /* ========== 画像OCR ========== */
   async function ocrImage(file){
     try{
       const worker = await Tesseract.createWorker('jpn');
@@ -531,10 +491,14 @@
       await worker.terminate();
       return text;
     }catch(e){
-      const worker = await Tesseract.createWorker('eng');
-      const { data:{ text } } = await worker.recognize(file);
-      await worker.terminate();
-      return text;
+      try{
+        const worker = await Tesseract.createWorker('eng');
+        const { data:{ text } } = await worker.recognize(file);
+        await worker.terminate();
+        return text;
+      }catch(err){
+        throw e;
+      }
     }
   }
 
@@ -556,7 +520,7 @@
     const rnd=seedRand(seed); const dates=monthDates(year,month);
     return CLASSMATES.filter(n=>n!=='橋本淑雅').map(name=>{
       let sum=0; dates.forEach(()=>{const r=rnd(); if(r>0.65) sum+=10; else if(r>0.50) sum+=6;});
-      if(name==='望月亜希子') sum += 20 + Math.floor(rnd()*10);
+      if(name==='望月亜希子') sum += 20 + Math.floor(rnd()*10); // Top5寄せ
       return {name, pts:sum};
     });
   }
@@ -587,7 +551,7 @@
     '橋本淑雅','望月亜希子',
     '永田秀仁','高橋','嶋康','田中','池之内英明','加藤','佐々木','富田雄二','富島雅人','成木洋平','唐杉先生',
     'ぷろたん','大森元木','橋本範之','米山隆一','ひろゆき',
-    '綾瀬はるか','永野芽郁','石原さとみ','北川景子','有村架純','長澤まさみ','広瀬すず','深田恭子',
+    '綾瀬はるか','永野芽郁','石原さとみ','北川景色','有村架純','長澤まさみ','広瀬すず','深田恭子',
     '本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀',
     '多部未華子','戸田恵梨香','広瀬アリス','吉高由里子'
   ];
@@ -738,16 +702,20 @@
   }
 
   /* ========== イベント ========== */
+
+  // 表示名
   (function initName(){
     const saved=localStorage.getItem(NAME_KEY);
     $('#displayName').value = saved || '橋本淑雅';
   })();
   $('#saveName').addEventListener('click',()=>{ localStorage.setItem(NAME_KEY, ($('#displayName').value||'橋本淑雅').trim()); renderRank(); });
 
+  // タブ切替
   $('#tabProgress').addEventListener('click',()=>showPage('progress'));
   $('#tabClass').addEventListener('click',()=>showPage('class'));
   $('#tabRank').addEventListener('click',()=>showPage('rank'));
 
+  // ページ移動
   $('#pagePrev').addEventListener('click',()=>{
     const i = pageIndexNow();
     const ni = (i+3-1)%3;
@@ -759,32 +727,39 @@
     showPage(PAGES[ni]);
   });
 
+  // 月移動・保存・読込・表示切替
   $('#prev').addEventListener('click',()=>{ pushHistory(); month-=1; if(month<0){month=11;year-=1;} load(); renderProgress(); renderRank(); });
   $('#next').addEventListener('click',()=>{ pushHistory(); month+=1; if(month>11){month=0;year+=1;} load(); renderProgress(); renderRank(); });
   $('#save').addEventListener('click',save);
   $('#load').addEventListener('click',()=>{ const ok=load(); renderProgress(); renderRank(); alert(ok?'読み込みました':'保存データが見つかりません'); });
   $('#toggleCompact').addEventListener('click',()=>{ document.body.classList.toggle('compact'); });
 
-  // ★ 取込前に必ずスキャフォールド
-  function prepareForImport(){ ensureScaffold(); }
-
-  // 貼り付け取込：CSV/縦一列 → ダメならタイプ行
+  // ===== ここが修正点：貼り付けは CSV/表を最優先、その後 簡易タイプ =====
   $('#importPaste').addEventListener('click',()=>{
-    const text = prompt('CSV/TSV/縦一列、または「8/13(日) 休日」形式を貼り付け');
+    const text = prompt('日付と種別の一覧や、縦一列/CSVの表を貼り付け（例: 8/13(日) 休日 など）');
     if(!text) return;
     pushHistory();
-    prepareForImport();
-    const n = importAnyText(text);
-    renderProgress(); renderRank();
-    alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした（見出し・月・書式を確認）');
+
+    let n = 0;
+    try { n = importAnyText(text); } catch(_){ n = 0; }
+    if(!n) n = parseTypeImport(text);
+
+    if(!n){
+      const m = (text.match(/(\d{1,2})[\/\-月](\d{1,2})/)||[])[1];
+      const nowMonth = (new Date()).getMonth()+1;
+      const hint = m ? `（画面の月:${nowMonth}月／データ:${m}月?）` : '';
+      alert(`反映対象が見つかりませんでした（見出し・月・書式を確認）${hint}`);
+    }else{
+      renderProgress(); renderRank();
+      alert(`当月に ${n} 件反映しました`);
+    }
   });
 
-  // CSV/TSV/TXT取込
+  // ファイル取込：通常CSV→縦一列の順に自動判別
   $('#importFile').addEventListener('change',async (e)=>{
     const f=e.target.files?.[0]; if(!f) return;
     const txt=await f.text();
     pushHistory();
-    prepareForImport();
     const n= importAnyText(txt);
     renderProgress(); renderRank();
     alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした（見出し・当月か要確認）');
@@ -797,8 +772,7 @@
     try{
       const text = await ocrImage(f);
       pushHistory();
-      prepareForImport();
-      const n = importAnyText(text);
+      const n = importAnyText(text) || parseTypeImport(text||'');
       renderProgress(); renderRank();
       alert(n?`OCR取込で当月に ${n} 件反映しました`:'文字が認識できないか、当月データが見つかりませんでした');
     }catch(err){
@@ -808,15 +782,19 @@
     }
   });
 
+  // Undo/Redo/全削除
   $('#undoP').onclick = $('#undoC').onclick = $('#undoT').onclick = ()=>undo();
   $('#redoP').onclick = $('#redoC').onclick = $('#redoT').onclick = ()=>redo();
   $('#wipeP').onclick = ()=>{ if(confirm('当月の進捗を初期化します。よろしいですか？')){ pushHistory(); monthDates(year,month).forEach(ds=>{ const r=rows.find(x=>x.date===ds); if(r){ r.type='学習'; r.goal=''; r.result=''; r.review=''; r.color='normal'; persist(r);} }); renderProgress(); renderRank(); } };
   $('#wipeC').onclick = ()=>{ if(confirm('Cページの発話状態をリセットしますか？')){ recentLines.length=0; lastSpeaker.name=null; clearSpeechTimers(); buildClassroom(); } };
   $('#wipeT').onclick = ()=>{ if(confirm('ランキング表示を再計算しますか？')){ renderRank(); } };
 
+  // 右下：ホームへ
   $('#fabHome').addEventListener('click',()=> showPage('progress'));
 
+  // 初期表示
   (function init(){
+    // 旧キー移行
     const keyOld=`studyplanner.v14.ocr:${year}-${String(month+1).padStart(2,'0')}`;
     const rawOld=localStorage.getItem(keyOld);
     if(rawOld && !localStorage.getItem(`${KEY}:${year}-${String(month+1).padStart(2,'0')}`)){
