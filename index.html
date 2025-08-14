@@ -239,14 +239,10 @@
     });
     try{ localStorage.setItem(currentKey(), JSON.stringify(data)); }catch(_){}
   }
-  function touch(){ // schedule autosave
-    if(autoSaveTimer) clearTimeout(autoSaveTimer);
+  function touch(){ if(autoSaveTimer) clearTimeout(autoSaveTimer);
     autoSaveTimer = setTimeout(()=>{ doSaveToLocal(); autoSaveTimer=null; }, AUTOSAVE_MS);
   }
-  function flushAutoSave(){ // immediate save
-    if(autoSaveTimer){ clearTimeout(autoSaveTimer); autoSaveTimer=null; }
-    doSaveToLocal();
-  }
+  function flushAutoSave(){ if(autoSaveTimer){ clearTimeout(autoSaveTimer); autoSaveTimer=null; } doSaveToLocal(); }
   window.addEventListener('beforeunload', flushAutoSave);
 
   /* ========== Undo/Redo ========== */
@@ -272,13 +268,7 @@
   function persist(rec){const i=rows.findIndex(x=>x.date===rec.date); if(i>=0) rows[i]=rec; else rows.push(rec);}
 
   /* ========== ローカル保存/読込 ========== */
-  function save(){ // manual
-    pushHistory();
-    flushAutoSave();
-    alert('更新しました（この端末のブラウザ内）');
-    renderRank();
-    scrollTodayIntoView();
-  }
+  function save(){ pushHistory(); flushAutoSave(); alert('更新しました（この端末のブラウザ内）'); renderRank(); scrollTodayIntoView(); }
   function load(){
     const raw=localStorage.getItem(currentKey());
     if(!raw) return false;
@@ -364,8 +354,8 @@
   function normalizeDateToken(raw){
     if(!raw) return null;
     let s = String(raw).trim();
-    s = s.replace(/（.*?）|\(.*?\)/g,'');  // 曜日などの括弧を除去
-    s = s.replace(/[．。・‒–—―〜～]/g,'-'); // 似た記号を正規化
+    s = s.replace(/（.*?）|\(.*?\)/g,''); 
+    s = s.replace(/[．。・‒–—―〜～]/g,'-'); 
     let m = s.match(/^(\d{4})\s*[-/]\s*(\d{1,2})\s*[-/]\s*(\d{1,2})$/);
     if(m){ return {y:+m[1], mo:+m[2]-1, d:+m[3]}; }
     m = s.match(/^(\d{1,2})\s*(?:\/|月)\s*(\d{1,2})/);
@@ -388,7 +378,6 @@
       let typ = parts[1].replace(/\s/g,'').trim();
       if(typ==='休み') typ='休日';
       if(!/^(学習|休日|復習)$/.test(typ)) continue;
-
       if(dtk.y!==year || dtk.mo!==month) continue;
       const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
       const rec = rows.find(x=>x.date===ds);
@@ -568,7 +557,7 @@
     }
   }
 
-  /* ========== クラスメート（吹き出し） ========== */
+  /* ========== クラスメート（吹き出し：拡張版） ========== */
   const CLASSMATES = [
     '橋本淑雅','望月亜希子',
     '永田秀仁','高橋','嶋康','田中','池之内英明','加藤','佐々木','富田雄二','富島雅人','成木洋平','唐杉先生',
@@ -582,41 +571,150 @@
     'ぷろたん','大森元木','米山隆一','ひろゆき',
     '綾瀬はるか','永野芽郁','石原さとみ','北川景色','有村架純','長澤まさみ','広瀬すず','深田恭子',
     '本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀','多部未華子','戸田恵梨香','広瀬アリス','吉高由里子',
-    '望月亜希子'
+    '望月亜希子','唐杉先生'
+  ]);
+
+  // ▼ ランダム生成用パーツ（組み合わせで100倍以上に増殖）
+  const rand = (a)=> a[Math.floor(Math.random()*a.length)];
+  const ends = ['いこ！','いける！','やれる！','やっちゃお！','サクッと！','集中モード！','+10pt取りにいこ！','気楽に！','丁寧に！','一問ずつ！'];
+  const pushers = ['全力','淡々','着実','超集中','静かに燃える','にこっと','きりっと','時短で','丁寧に','爆伸びムードで'];
+  const emojis = ['🔥','💪','✨','📚','📝','🎯','⏱️','🌟','🥇','🚀'];
+  const breakTips = ['3分ストレッチ','1分深呼吸','白湯を一口','窓の外を10秒','目を閉じて15秒','肩回し10回','姿勢を直す','音量を下げる','机を拭く','タイマー再セット'];
+
+  // 科目ネタ：世界史/地理/漢文/古文/現代文/倫理/化学/物理
+  const subjectLines = {
+    世界史:[
+      '年号は物語で覚えると定着するよ','因果関係→結果の流れで整理','地図と一緒に眺めると記憶が強化',
+      '人物相関でまとめて暗記','頻出国は時代ごとのキーワードで'
+    ],
+    地理:[
+      '地図帳を開いて手を動かすと定着↑','グラフは単位・軸から読む','気候は風と海流のセットで理解',
+      '工業は立地と輸送コストの視点で','農業は作物×緯度×水'
+    ],
+    漢文:[
+      '返り点はリズムで読むと楽','再読文字は口に出すと覚える','句形ごとに短冊カード化しよう',
+      '主語と述語をまず拾う','送り仮名の感覚を掴もう'
+    ],
+    古文:[
+      '係り結びが決まれば90%勝ち','主語補うと一気に読める','和歌は心情ワードを拾う',
+      '敬語は立場を図にすると早い','古語は場面ごとに束ねて暗記'
+    ],
+    現代文:[
+      '設問から本文に戻る逆走読解','指示語は直前の名詞を確認','対比・因果の接続に注目',
+      '要約は30字で練習','筆者の主張→根拠の順で線を引く'
+    ],
+    倫理:[
+      '用語は「誰が何を主張」セットで','近代以降は年代感をざっくり','図で思想の系譜をつなぐ',
+      'キーワードを自分の言葉に置換','似ている主張は対比表に'
+    ],
+    化学:[
+      '条件（温度/圧力）を書き出そう','モル計算は単位を最後まで','構造式は丁寧に描くと速い',
+      '酸化還元は半反応式に分解','実験操作は目的と理由をメモ'
+    ],
+    物理:[
+      '力の向きを図で分解','次元（単位）でミス検出','エネルギー保存で一気に解く',
+      '等加速度は式を並べて選ぶ','ベクトルは成分ごとに処理'
+    ]
+  };
+
+  // 唐杉先生：日本史の名言（安全な範囲で厳選）
+  const jpHistoryQuotes = [
+    '「志を立てて以て万事の源となす」— 吉田松陰',
+    '「成せば成る、成さねば成らぬ」— 上杉鷹山',
+    '「心が変われば行動が変わる」— 中村天風',
+    '「日日是好日」— 千利休',
+    '「遅れてもよい、やめなければ必ず着く」— 正岡子規',
+    '「学は人たる所以を学ぶなり」— 福沢諭吉',
+    '「和して同ぜず」— 聖徳太子',
+    '「至誠にして動かざる者は、未だ之れ有らざるなり」— 吉田松陰',
+    '「思うこと成らぬは思い足らぬが故なり」— 二宮尊徳',
+    '「忍耐は苦いが、その実は甘い」— 徳川家康'
+  ];
+
+  // 性格（ざっくり）— 名前により口調を少し変える
+  const PERSONA = {
+    genki:['ファイト！','やっちゃお！','最高の一日作ろ！'],
+    cool:['粛々と。','静かな集中で。','丁寧にいこう。'],
+    tsun:['別に…応援なんかしないけど、やるなら本気でね','ふーん、その調子','ミスは伸びしろ。以上'],
+    senpai:['ここを押さえれば点になるよ','コツはシンプル、継続だよ','迷ったら原理に戻るんだ']
+  };
+
+  const NAME_PERSONA = new Map([
+    ['望月亜希子','genki'],['永田秀仁','cool'],['高橋','senpai'],['嶋康','cool'],['田中','genki'],
+    ['池之内英明','senpai'],['加藤','tsun'],['佐々木','cool'],['富田雄二','genki'],
+    ['富島雅人','senpai'],['成木洋平','cool'],['ぷろたん','genki'],['ひろゆき','tsun']
   ]);
 
   const recentLines = [];
   let lastSpeaker = { name:null, ts:0 };
   let classTicker = null;
 
-  function lineFor(name){
-    const base = [
-      '今日も一歩ずつ！','その調子！','休憩も忘れずに','昨日の復習いこ！',
-      '目標メモした？','終わったら＋10ptだ！','分からない所は付箋！'
+  function personaTail(name){
+    const p = NAME_PERSONA.get(name);
+    if(!p) return '';
+    return ' ' + rand(PERSONA[p]);
+  }
+
+  // 1) 一般生徒の励ましを生成（科目ネタ＋テンション）
+  function makeStudentLine(name){
+    const subjKeys = Object.keys(subjectLines);
+    const subj = rand(subjKeys);
+    const tip = rand(subjectLines[subj]);
+    const tail = rand(ends);
+    const mood = rand(pushers);
+    const em = rand(emojis);
+    const you = ($('#displayName').value||'君').trim();
+    const pattern = [
+      `${subj}：${tip} ${tail} ${em}`,
+      `${mood}に${subj}いこう。${tip}`,
+      `${you}、${subj}で一歩進めよ。${tip}`,
+      `${subj}→${tip}／終わったら${rand(breakTips)}ね`,
+      `${subj}の時間。${tip} ${em}`
     ];
-    const fam = [
-      'ナイス！映えてる！','全集中だね！','今日のベスト更新いける！'
+    return rand(pattern) + personaTail(name);
+  }
+
+  // 2) 唐杉先生：名言を高確率で引用
+  function makeTeacherLine(){
+    const useQuote = Math.random() < 0.65;
+    if(useQuote) return rand(jpHistoryQuotes);
+    const you = ($('#displayName').value||'君').trim();
+    const pattern = [
+      `日本史は因果で捉える。出来事→理由→結果の順に線を引け、${you}。`,
+      `まずは用語を自分の言葉にせよ。暗記は理解の入口だ、${you}。`,
+      `史料は主語と立場を押さえると一気に読めるぞ。`,
+      `今日は通史を一本通す。細部はあとで肉付けだ。`,
+      `迷ったら時代の流れに戻れ。地図と年表を並べるんだ。`
     ];
-    const pool = FAMOUS_SET.has(name) ? base.concat(fam) : base;
-    let msg = pool[Math.floor(Math.random()*pool.length)];
-    let guard = 0;
-    while(recentLines.includes(msg) && guard++<5){
-      msg = pool[Math.floor(Math.random()*pool.length)];
+    return rand(pattern);
+  }
+
+  // 重複防止（最近20件の台詞は避ける）
+  function pickUnique(generator, tries=10){
+    let msg='';
+    for(let i=0;i<tries;i++){
+      msg = generator();
+      if(!recentLines.includes(msg)) break;
     }
     recentLines.push(msg);
-    if(recentLines.length>8) recentLines.shift();
+    if(recentLines.length>20) recentLines.shift();
     return msg;
   }
+
   function showBubble(deskEl, name){
     const bubble = deskEl.querySelector('.bubble');
     if(!bubble) return;
     const isFamous = FAMOUS_SET.has(name);
     bubble.className = 'bubble' + (isFamous ? ' famous' : '');
-    bubble.textContent = lineFor(name);
+    const line = (name==='唐杉先生')
+      ? pickUnique(makeTeacherLine)
+      : pickUnique(()=>makeStudentLine(name));
+    bubble.textContent = line;
     bubble.classList.add('show');
     setTimeout(()=> bubble.classList.remove('show'), 3000);
     lastSpeaker = {name, ts:Date.now()};
   }
+
   function buildClassroom(){
     const desks=$('#desks'); if(!desks) return; desks.innerHTML='';
     CLASSMATES.forEach((name)=>{
@@ -631,19 +729,52 @@
       desks.appendChild(d);
     });
   }
+
+  // 入室時に一気に数人が発話（ガヤ感）
+  function burstBubbles(n=3){
+    const desks = Array.from(document.querySelectorAll('#desks .desk'));
+    if(desks.length===0) return;
+    const used = new Set();
+    for(let k=0;k<n;k++){
+      setTimeout(()=>{
+        let el=null, guard=0;
+        while(guard++<10){
+          const cand = rand(desks);
+          const name = cand.querySelector('.name')?.textContent||'';
+          if(!used.has(name)){ used.add(name); el=cand; break; }
+        }
+        if(el){
+          const name = el.querySelector('.name')?.textContent||'';
+          showBubble(el, name);
+        }
+      }, k*400);
+    }
+  }
+
+  // 周期的にも時々2人同時に発話
   function startClassTicker(){
     stopClassTicker();
     classTicker = setInterval(()=>{
       const desks = Array.from(document.querySelectorAll('#desks .desk'));
       if(desks.length===0) return;
-      const idx = Math.floor(Math.random()*desks.length);
-      const el = desks[idx];
-      const name = el.querySelector('.name')?.textContent || '';
-      if(name){
-        if(name===lastSpeaker.name && Date.now()-lastSpeaker.ts<2500) return;
-        showBubble(el, name);
+      const multi = Math.random()<0.4 ? 2 : 1;
+      const chosen = new Set();
+      for(let i=0;i<multi;i++){
+        setTimeout(()=>{
+          let el=null, guard=0;
+          while(guard++<10){
+            const cand = rand(desks);
+            const name = cand.querySelector('.name')?.textContent||'';
+            const tooSoon = (name===lastSpeaker.name && Date.now()-lastSpeaker.ts<2000);
+            if(!chosen.has(name) && !tooSoon){ chosen.add(name); el=cand; break; }
+          }
+          if(el){
+            const name = el.querySelector('.name')?.textContent||'';
+            showBubble(el, name);
+          }
+        }, i*350);
       }
-    }, 3500);
+    }, 2200);
   }
   function stopClassTicker(){
     if(classTicker){ clearInterval(classTicker); classTicker=null; }
@@ -671,7 +802,7 @@
     }
     if(which==='class'){
       show(p2,[p1,p3]); t2.classList.add('active'); t1.classList.remove('active'); t3.classList.remove('active');
-      buildClassroom(); startClassTicker();
+      buildClassroom(); burstBubbles(3+Math.floor(Math.random()*2)); startClassTicker();
     }
     if(which==='rank'){
       show(p3,[p1,p2]); t3.classList.add('active'); t1.classList.remove('active'); t2.classList.remove('active');
@@ -761,11 +892,10 @@
     const p2 = $('#pageClass').style.display!=='none';
     const p3 = $('#pageRank').style.display!=='none';
     if(p1) renderProgress();
-    if(p2) { buildClassroom(); startClassTicker(); }
+    if(p2) { buildClassroom(); burstBubbles(3+Math.floor(Math.random()*2)); startClassTicker(); }
     if(p3) renderRank();
   }
   (function init(){
-    // 旧キー移行
     const keyOld=`studyplanner.v14.ocr:${year}-${String(month+1).padStart(2,'0')}`;
     const rawOld=localStorage.getItem(keyOld);
     if(rawOld && !localStorage.getItem(currentKey())){
