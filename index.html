@@ -19,8 +19,6 @@
     --male:#2563eb;        /* 男性=青 */
     --female:#f97316;      /* 女性=オレンジ */
 
-    --board:#0f3b3f; --board-frame:#2f4f4f; --desk:#ffffff; --room:#f7fafc;
-
     --bubble-gen-bg:#f4f8ff;   --bubble-gen-bd:#d6e6ff;
     --bubble-fam-bg:#fff9ec;   --bubble-fam-bd:#ffe5ad;
 
@@ -43,16 +41,13 @@
   .tab{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:#fff;cursor:pointer}
   .tab.active{background:#eef2ff;border-color:#c7d2fe}
 
-  /* ページ操作（進む/戻る） */
   .pager{display:flex;gap:8px;align-items:center;margin:6px 0 6px}
 
-  /* 今日バナー */
   .today-banner{
     margin:6px 0 10px;padding:8px 12px;border:1px solid var(--line);
     border-radius:10px;background:#f8fafc;font-size:calc(14px*var(--scale))
   }
 
-  /* 表（進捗） */
   .tbl{
     width:100%;border:1px solid var(--line);border-radius:12px;overflow:auto;
     max-height:calc(84vh*var(--scale));
@@ -61,8 +56,8 @@
   th,td{padding:calc(8px*var(--scale));border-bottom:1px solid var(--line);vertical-align:top;background:#fff}
   th{
     text-align:left;font-weight:600;font-size:calc(12px*var(--scale));color:var(--muted);
-    position:sticky;top:0;z-index:3;background:var(--header-bg);
-    border-bottom:2px solid var(--line);box-shadow:var(--header-shadow);backdrop-filter:saturate(1.1);
+    position:sticky;top:0;z-index:3;background:#fff;
+    border-bottom:2px solid var(--line);box-shadow:0 6px 12px rgba(0,0,0,.06);backdrop-filter:saturate(1.1);
   }
   td.padL{padding-left:calc(14px*var(--scale))}
   td.small{width:calc(110px*var(--scale))}
@@ -78,7 +73,6 @@
     font-size:calc(12px*var(--scale));cursor:pointer
   }
 
-  /* 右下：ホームへ(🐹) */
   .fab{
     position:fixed;z-index:5;width:54px;height:54px;border-radius:50%;
     display:flex;align-items:center;justify-content:center;border:1px solid var(--line);background:#fff;
@@ -88,8 +82,7 @@
   .fab:hover{transform:translateY(-1px)} .fab:active{transform:translateY(0)}
   .fab span{font-size:22px;line-height:1}
 
-  /* C：教室ページ */
-  .blackboard{border-radius:10px;border:2px solid var(--board-frame);background:#0f3b3f;color:#e0f2f1;padding:10px 12px;font-weight:600;margin-bottom:10px}
+  .blackboard{border-radius:10px;border:2px solid #2f4f4f;background:#0f3b3f;color:#e0f2f1;padding:10px 12px;font-weight:600;margin-bottom:10px}
   .room{border:1px solid var(--line);border-radius:12px;padding:14px;background:#f7fafc;max-height:80vh;overflow:auto}
   .desks{display:grid;gap:12px;grid-template-columns:repeat(3, minmax(0,1fr))}
   .desk{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;min-height:110px;display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden}
@@ -112,35 +105,30 @@
   .bubble.show{display:block;animation:fadeIn .15s ease}
   @keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 
-  /* T：ランキングページ */
   .rank-card{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff}
   .rank-grid{column-width:240px;column-gap:16px}
   .rank-item{break-inside:avoid;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0;background:#fff;display:block}
   .rank-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .rank-no{font-weight:800;min-width:3.5em}
 
-  /* ページ操作バー（Undo/Redo/全削除） */
   .ops{display:flex;gap:8px;align-items:center;margin:6px 0 10px}
 </style>
 </head>
 <body>
   <h1>学習計画（1ヶ月表示）</h1>
 
-  <!-- 表示名 -->
   <div class="topbar">
     <input id="displayName" type="text" placeholder="表示名（例：橋本淑雅）" style="min-width:240px">
     <button id="saveName">保存</button>
     <span class="muted">※保存すると呼びかけ・順位に反映</span>
   </div>
 
-  <!-- タブ -->
   <div class="tabs">
     <button id="tabProgress" class="tab active">進捗</button>
     <button id="tabClass" class="tab" title="学校">C 🏫</button>
     <button id="tabRank" class="tab" title="順位">T 🏆</button>
   </div>
 
-  <!-- ページ進む/戻る -->
   <div class="pager">
     <button id="pagePrev">◀ 戻る</button>
     <button id="pageNext">進む ▶</button>
@@ -223,12 +211,15 @@
     </div>
   </section>
 
-  <!-- 右下：🐹ホームへ（右上📍は無し） -->
   <button class="fab" id="fabHome" title="ホームへ"><span>🐹</span></button>
 
 <script>
 (function(){
   'use strict';
+
+  /* ====== 簡易エラー通知（デバッグ用） ====== */
+  window.onerror = (m, s, l) => alert('[Error] ' + m + '\n' + s + ':' + l);
+
   const KEY='studyplanner.v15.ocr';
   const NAME_KEY='studyplanner.displayName';
 
@@ -264,7 +255,7 @@
     const data=rows.filter(r=>fromYmd(r.date).getMonth()===month && fromYmd(r.date).getFullYear()===year);
     localStorage.setItem(key, JSON.stringify(data));
     alert('更新しました（この端末のブラウザ内）');
-    renderRank(); // ページ移動しない
+    renderRank();
   }
   function load(){
     const key=`${KEY}:${year}-${String(month+1).padStart(2,'0')}`;
@@ -344,7 +335,7 @@
     scroller.scrollTo({top:Math.max(0,rowTop-headerH-4)});
   }
 
-  /* ========== 取り込み：貼付 / CSV/TSV / OCR ========== */
+  /* ========== 取り込み系共通 ========== */
   function normalizeDateToken(raw){
     if(!raw) return null;
     raw = String(raw).trim();
@@ -359,7 +350,6 @@
     }
     return {y,mo,d};
   }
-
   function clean(v){
     const s = String(v ?? '').trim();
     if(!s) return '';
@@ -422,7 +412,7 @@
       if(t==='休み') t='休日';
       if(/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; }
 
-      // 「列が存在するなら空でも上書き」←重要
+      // 列が存在するなら空でも上書き
       if(col.goal   !== undefined) rec.goal   = clean(o[col.goal]);
       if(col.result !== undefined) rec.result = clean(o[col.result]);
       if(col.review !== undefined) rec.review = clean(o[col.review]);
@@ -432,7 +422,7 @@
     return applied;
   }
 
-  /* ====== 縦一列フォーマット対応（追加） ====== */
+  /* ====== 縦一列フォーマット対応 ====== */
   function looksLikeColumnBlocks(text){
     const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
     if (L.length < 12) return false;
@@ -446,7 +436,6 @@
   function parseColumnBlocks(text){
     const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
     const i = L.findIndex(s => s.includes('日付'));
-    const header = L.slice(i, i+5).map(s=>s.replace(/\s/g,''));
     const data = L.slice(i+5);
 
     const rows = [];
