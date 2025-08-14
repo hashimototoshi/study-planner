@@ -16,13 +16,13 @@
     --header-bg:#ffffff; --header-shadow:0 6px 12px rgba(0,0,0,.06);
     --accent:#2563eb;
 
-    --male:#2563eb;        /* 男性=青 */
-    --female:#f97316;      /* 女性=オレンジ */
+    --male:#2563eb;
+    --female:#f97316;
 
     --bubble-gen-bg:#f4f8ff;   --bubble-gen-bd:#d6e6ff;
     --bubble-fam-bg:#fff9ec;   --bubble-fam-bd:#ffe5ad;
 
-    --scale: 1; /* 一覧スケール（1=標準, 0.72=詰め）*/
+    --scale: 1;
   }
   *{box-sizing:border-box}
   body{margin:0;padding:14px;font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",sans-serif;color:#111827;background:#fff}
@@ -57,7 +57,7 @@
   th{
     text-align:left;font-weight:600;font-size:calc(12px*var(--scale));color:var(--muted);
     position:sticky;top:0;z-index:3;background:#fff;
-    border-bottom:2px solid var(--line);box-shadow:var(--header-shadow);backdrop-filter:saturate(1.1);
+    border-bottom:2px solid var(--line);box-shadow:0 6px 12px rgba(0,0,0,.06);backdrop-filter:saturate(1.1);
   }
   td.padL{padding-left:calc(14px*var(--scale))}
   td.small{width:calc(110px*var(--scale))}
@@ -220,7 +220,7 @@
   const KEY='studyplanner.v15.ocr';
   const NAME_KEY='studyplanner.displayName';
 
-  let year=(new Date()).getFullYear(), month=(new Date()).getMonth();
+  let year=(new Date()).getFullYear(), month=(new Date()).getMonth(); // 0=Jan, 7=Aug
   let rows=[]; // {date,type,goal,result,review,color}
 
   /* ========== Undo/Redo ========== */
@@ -332,21 +332,47 @@
     scroller.scrollTo({top:Math.max(0,rowTop-headerH-4)});
   }
 
-  /* ========= 取り込み：共通ユーティリティ ========= */
+  /* ========== 取り込み：ユーティリティ ========== */
+
+  // CSV 1行を「引用対応」で分割
+  function splitCSV(line, sep=','){
+    const out=[]; let cur=''; let inQ=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(ch === '"'){
+        if(inQ && line[i+1] === '"'){ cur+='"'; i++; }
+        else inQ = !inQ;
+      }else if(ch === sep && !inQ){
+        out.push(cur); cur='';
+      }else{
+        cur += ch;
+      }
+    }
+    out.push(cur);
+    return out;
+  }
+
+  // 日付トークンを厳密化：テキスト側の月を使う／曜日は捨てる／全角ダッシュ等を吸収
   function normalizeDateToken(raw){
     if(!raw) return null;
-    raw = String(raw).trim();
-    raw = raw.replace(/（.*?）|\(.*?\)/g,'').trim(); // 曜日カッコ除去
-    let y, mo, d;
-    let m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if(m){ y=+m[1]; mo=+m[2]-1; d=+m[3]; }
-    else{
-      const m1 = raw.match(/^(\d{1,2})[\/\-月](\d{1,2})/);
-      if(!m1) return null;
-      y = year; mo = month; d = +m1[2];
-    }
-    return {y,mo,d};
+    raw = String(raw).replace(/\uFEFF/g,'').trim();
+    // ()や（）の中（曜日）を除去
+    raw = raw.replace(/[（(].*?[)）]/g,'').trim();
+    // 異体字ダッシュ等を正規化
+    raw = raw.replace(/[–—−]/g,'-').replace(/[．。]/g,'.');
+
+    // 例: 2025-08-14 / 2025/8/14 / 2025.8.14
+    let m = raw.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+    if(m){ return { y:+m[1], mo:+m[2]-1, d:+m[3] }; }
+
+    // 例: 8/14 / 8-14 / 8月14
+    m = raw.match(/^(\d{1,2})[\/\-月\.](\d{1,2})$/);
+    if(m){ return { y:year, mo:+m[1]-1, d:+m[2] }; }
+
+    return null;
   }
+
+  // 空っぽ/NaN/null/undefined → 空文字に
   function clean(v){
     const s = String(v ?? '').trim();
     if(!s) return '';
@@ -354,195 +380,150 @@
     return s;
   }
 
-  /* ========= 1) タイプリスト（8/13 休日 等） ========= */
+  // 「8/13 休日」等の簡易リスト
   function parseTypeImport(text){
     const lines = (text||'').replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
     let applied=0;
     for(const ln of lines){
-      const parts = ln.split(/[\s,　\t]+/).filter(Boolean);
+      const parts = ln.split(/[\s,　\t]+/).filter(Boolean); // CSVっぽくてもここでは「種別だけ」更新
       if(parts.length<2) continue;
       const dtk = normalizeDateToken(parts[0]); if(!dtk) continue;
       let typ = parts[1].replace(/\s/g,'').trim();
       if(typ==='休み') typ='休日';
       if(!/^(学習|休日|復習)$/.test(typ)) continue;
 
-      if(dtk.y!==year || dtk.mo!==month) continue; // 当月のみ
+      // ★ テキスト側の月を尊重する
       const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
+      // 当月のみ反映（UIの月と一致したときに反映される）
+      if(dtk.y!==year || dtk.mo!==month) continue;
+
       const r = rows.find(x=>x.date===ds);
       if(r){ pushHistory(); r.type=typ; persist(r); applied++; }
     }
     return applied;
   }
 
-  /* ========= 2) 堅牢CSVパーサ（RFC4180 + タブ + 全角カンマ） ========= */
-  function detectDelimiter(text){
-    const head = text.slice(0, 4000);
-    const tab = (head.match(/\t/g)||[]).length;
-    const comma = (head.match(/,/g)||[]).length + (head.match(/，/g)||[]).length;
-    return tab>0 ? '\t' : (comma>0 ? ',' : ',');
-  }
-  function csvParseRFC4180(text){
-    if (!text) return {header:[], rows:[]};
-    // BOM除去 & 全角カンマ→半角
-    if (text.charCodeAt(0)===0xFEFF) text=text.slice(1);
-    text = text.replace(/，/g, ',');
-    const sep = detectDelimiter(text);
-    const lines = text.replace(/\r\n?/g,'\n').split('\n').filter(l=>l!=='');
-
-    function splitCSV(line){
-      const out=[]; let cur=''; let inQ=false;
-      for(let i=0;i<line.length;i++){
-        const ch=line[i];
-        if(inQ){
-          if(ch=== '"'){
-            if(line[i+1]==='"'){ cur+='"'; i++; }
-            else{ inQ=false; }
-          }else cur+=ch;
-        }else{
-          if(ch === '"'){ inQ=true; }
-          else if(ch === sep){ out.push(cur.trim()); cur=''; }
-          else cur+=ch;
-        }
-      }
-      out.push(cur.trim());
-      return out;
-    }
-
-    const header = (sep==='\t') ? lines[0].split('\t').map(s=>s.trim()) : splitCSV(lines[0]);
+  // 区切りテキスト（CSV/TSV）
+  function parseDelimited(text){
+    if(text.charCodeAt(0)===0xFEFF) text = text.slice(1);
+    const hasTab = text.indexOf('\t')!==-1;
+    const sep = hasTab ? '\t' : ',';
+    const lines = text.replace(/\r\n?/g,'\n').split('\n').filter(l=>l.trim()!=='');
+    const header = (hasTab ? lines[0].split('\t') : splitCSV(lines[0], ',')).map(s=>s.trim());
     const rows = lines.slice(1).map(line=>{
-      const cells = (sep==='\t') ? line.split('\t').map(s=>s.trim()) : splitCSV(line);
-      const obj={}; header.forEach((h,i)=> obj[h] = (cells[i] ?? '').trim());
+      const cells = hasTab ? line.split('\t') : splitCSV(line, ',');
+      const obj = {};
+      header.forEach((h,i)=> obj[h] = (cells[i]??'').trim());
       return obj;
     });
     return {header, rows};
   }
-  function headerKey(h){
-    const s = String(h||'').trim().replace(/\s/g,'');
-    if (/^日付|date$/i.test(s)) return 'date';
-    if (/^種別|タイプ|type$/i.test(s)) return 'type';
-    if (/^目標|ゴール|目当て|goal$/i.test(s)) return 'goal';
-    if (/^結果|実績|result$/i.test(s)) return 'result';
-    if (/^復習|レビュー|review$/i.test(s)) return 'review';
-    return null;
-  }
-  function importCsvText(text){
-    const {header, rows:objs} = csvParseRFC4180(text);
-    if (!header.length) return 0;
 
+  function importCsvText(text){
+    const {header, rows:objs} = parseDelimited(text);
     const col = {};
-    header.forEach(h=>{ const k=headerKey(h); if(k) col[k]=h; });
-    if(!col.date || !col.type){
-      alert('CSV見出しを確認してください（少なくとも「日付」「種別」）');
-      return 0;
-    }
+    header.forEach(h=>{
+      if(/日付/.test(h)) col.date=h;
+      if(/種別/.test(h)) col.type=h;
+      if(/目標/.test(h)) col.goal=h;
+      if(/結果/.test(h)) col.result=h;
+      if(/復習/.test(h)) col.review=h;
+    });
+    if(!col.date || !col.type){ return 0; }
 
     let applied=0;
     for(const o of objs){
       const dtk = normalizeDateToken(o[col.date]); if(!dtk) continue;
-      if(dtk.y!==year || dtk.mo!==month) continue;
+      // ★ テキストの月を使ってキー化
       const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
-      const rec = rows.find(x=>x.date===ds); if(!rec) continue;
+      // 当月以外はスキップ（UIの月と一致しているか）
+      if(dtk.y!==year || dtk.mo!==month) continue;
+
+      const rec = rows.find(x=>x.date===ds);
+      if(!rec) continue;
 
       let t = clean(o[col.type]);
       if(t==='休み') t='休日';
       if(/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; }
 
-      if (col.goal   in o) rec.goal   = clean(o[col.goal]);
-      if (col.result in o) rec.result = clean(o[col.result]);
-      if (col.review in o) rec.review = clean(o[col.review]);
+      // 「列が存在するなら空でも上書き」
+      if(col.goal   !== undefined) rec.goal   = clean(o[col.goal]);
+      if(col.result !== undefined) rec.result = clean(o[col.result]);
+      if(col.review !== undefined) rec.review = clean(o[col.review]);
 
       persist(rec); applied++;
     }
     return applied;
   }
 
-  /* ========= 3) 縦一列フォーマット（空欄保持・ずれ防止） ========= */
+  /* ====== 縦一列フォーマット対応 ====== */
   function looksLikeColumnBlocks(text){
-    const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim());
-    const i = L.findIndex(s => /^日付$/.test(s));
-    if (i < 0) return false;
-    const needed = new Set(['日付','種別','目標','結果','復習']);
-    let count=0; for (let k=0;k<12 && i+k<L.length;k++){ if (needed.has(L[i+k])) count++; }
-    if (count<4) return false;
-    return L.slice(i).some(s => /^\d{1,2}[\/\-月]\d{1,2}/.test(s) || /^\d{4}-\d{2}-\d{2}$/.test(s));
+    const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
+    if (L.length < 12) return false;
+    const i = L.findIndex(s => s.includes('日付'));
+    if (i < 0 || i + 4 >= L.length) return false;
+    const head = L.slice(i, i+5);
+    const need = ['日付','種別','目標','結果','復習'];
+    if (!need.every((w,idx)=> (head[idx]||'').includes(w))) return false;
+    return L.slice(i+5).some(s => /^\d{1,2}[\/\-月]\d{1,2}/.test(s) || /^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(s));
   }
   function parseColumnBlocks(text){
-    const L0 = text.replace(/\r/g,'').split('\n');
-    const L = L0.map(s=>s.trim());
-    const fields = ['日付','種別','目標','結果','復習'];
+    const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
+    const i = L.findIndex(s => s.includes('日付'));
+    const data = L.slice(i+5);
 
-    const rowsOut = [];
-    let cur = { '日付':'', '種別':'', '目標':'', '結果':'', '復習':'' };
-    let expect = null;
-
-    function pushIfFilled(){
-      if (cur['日付']) rowsOut.push({...cur});
-      cur = { '日付':'', '種別':'', '目標':'', '結果':'', '復習':'' };
-      expect = null;
+    const rows = [];
+    let block = {};
+    let ptr = 0; // 0日付 1種別 2目標 3結果 4復習
+    for (const line of data){
+      if (['日付','種別','目標','結果','復習'].includes(line)) continue;
+      if (ptr === 0){ block={}; block['日付']=line; ptr=1; continue; }
+      if (ptr === 1){ block['種別']=line; ptr=2; continue; }
+      if (ptr === 2){ block['目標']=line; ptr=3; continue; }
+      if (ptr === 3){ block['結果']=line; ptr=4; continue; }
+      if (ptr === 4){ block['復習']=line; rows.push(block); ptr=0; continue; }
     }
-
-    for (let i=0; i<L.length; i++){
-      const line = L[i];
-
-      if (fields.includes(line)){
-        if (line==='日付' && cur['日付']) pushIfFilled();
-        expect = line;
-        continue;
-      }
-
-      if (line===''){
-        if (cur['日付']) pushIfFilled();
-        continue;
-      }
-
-      if (expect){
-        cur[expect] = line;
-        expect = null;
-        continue;
-      }
-
-      if (!cur['日付'] && normalizeDateToken(line)){
-        if (cur['日付']) pushIfFilled();
-        cur['日付'] = line;
-        continue;
-      }
+    if (ptr !== 0){
+      block['目標'] = block['目標'] ?? '';
+      block['結果'] = block['結果'] ?? '';
+      block['復習'] = block['復習'] ?? '';
+      rows.push(block);
     }
-
-    if (cur['日付']) rowsOut.push(cur);
-    return { header:['日付','種別','目標','結果','復習'], rows: rowsOut };
+    return { header:['日付','種別','目標','結果','復習'], rows };
   }
   function importAnyText(text){
-    // まずCSV系
+    // まずは CSV/縦一列 を優先
     try{
-      const n = importCsvText(text);
-      if (n>0) return n;
+      const n1 = importCsvText(text);
+      if (n1>0) return n1;
     }catch(_){}
-    // 次に縦一列
     if (looksLikeColumnBlocks(text)){
       const parsed = parseColumnBlocks(text);
       let applied=0;
+      const col = {date:'日付', type:'種別', goal:'目標', result:'結果', review:'復習'};
       for (const o of parsed.rows){
-        const dtk = normalizeDateToken(o['日付']); if(!dtk) continue;
-        if (dtk.y !== year || dtk.mo !== month) continue;
+        const dtk = normalizeDateToken(o[col.date]); if(!dtk) continue;
         const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
+        if(dtk.y!==year || dtk.mo!==month) continue;
         const rec = rows.find(x=>x.date===ds); if(!rec) continue;
 
-        let t = clean(o['種別']);
+        let t = clean(o[col.type]);
         if (t==='休み') t='休日';
         if (/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; }
 
-        rec.goal   = clean(o['目標']);
-        rec.result = clean(o['結果']);
-        rec.review = clean(o['復習']);
+        rec.goal   = clean(o[col.goal]);
+        rec.result = clean(o[col.result]);
+        rec.review = clean(o[col.review]);
 
         persist(rec); applied++;
       }
-      return applied;
+      if(applied>0) return applied;
     }
-    return 0;
+    // ダメなら「8/13 休日」形式
+    return parseTypeImport(text);
   }
 
-  /* ========= OCR ========= */
+  /* ========== 画像OCR ========== */
   async function ocrImage(file){
     try{
       const worker = await Tesseract.createWorker('jpn');
@@ -550,18 +531,14 @@
       await worker.terminate();
       return text;
     }catch(e){
-      try{
-        const worker = await Tesseract.createWorker('eng');
-        const { data:{ text } } = await worker.recognize(file);
-        await worker.terminate();
-        return text;
-      }catch(err){
-        throw e;
-      }
+      const worker = await Tesseract.createWorker('eng');
+      const { data:{ text } } = await worker.recognize(file);
+      await worker.terminate();
+      return text;
     }
   }
 
-  /* ========= ランキング ========= */
+  /* ========== ランキング ========== */
   function myMonthlyPoints(){
     let total=0;
     monthDates(year,month).forEach(date=>{
@@ -579,7 +556,7 @@
     const rnd=seedRand(seed); const dates=monthDates(year,month);
     return CLASSMATES.filter(n=>n!=='橋本淑雅').map(name=>{
       let sum=0; dates.forEach(()=>{const r=rnd(); if(r>0.65) sum+=10; else if(r>0.50) sum+=6;});
-      if(name==='望月亜希子') sum += 20 + Math.floor(rnd()*10); // Top5寄せ
+      if(name==='望月亜希子') sum += 20 + Math.floor(rnd()*10);
       return {name, pts:sum};
     });
   }
@@ -605,19 +582,19 @@
     }
   }
 
-  /* ========= クラスメート ========= */
+  /* ========== クラスメート ========== */
   const CLASSMATES = [
     '橋本淑雅','望月亜希子',
     '永田秀仁','高橋','嶋康','田中','池之内英明','加藤','佐々木','富田雄二','富島雅人','成木洋平','唐杉先生',
     'ぷろたん','大森元木','橋本範之','米山隆一','ひろゆき',
-    '綾瀬はるか','永野芽郁','石原さとみ','北川景色','有村架純','長澤まさみ','広瀬すず','深田恭子',
+    '綾瀬はるか','永野芽郁','石原さとみ','北川景子','有村架純','長澤まさみ','広瀬すず','深田恭子',
     '本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀',
     '多部未華子','戸田恵梨香','広瀬アリス','吉高由里子'
   ];
-  const FEMALES = new Set(['望月亜希子','綾瀬はるか','永野芽郁','石原さとみ','北川景色','有村架純','長澤まさみ','広瀬すず','深田恭子','本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀','多部未華子','戸田恵梨香','広瀬アリス','吉高由里子']);
+  const FEMALES = new Set(['望月亜希子','綾瀬はるか','永野芽郁','石原さとみ','北川景子','有村架純','長澤まさみ','広瀬すず','深田恭子','本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀','多部未華子','戸田恵梨香','広瀬アリス','吉高由里子']);
   const FAMOUS_SET = new Set([
     'ぷろたん','大森元木','米山隆一','ひろゆき',
-    '綾瀬はるか','永野芽郁','石原さとみ','北川景色','有村架純','長澤まさみ','広瀬すず','深田恭子',
+    '綾瀬はるか','永野芽郁','石原さとみ','北川景子','有村架純','長澤まさみ','広瀬すず','深田恭子',
     '本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀','多部未華子','戸田恵梨香','広瀬アリス','吉高由里子',
     '望月亜希子'
   ]);
@@ -632,6 +609,7 @@
     const min = p? p[0]:5000, max=p? p[1]:10000;
     return Math.floor(min + Math.random()*(max-min));
   }
+
   function lineForOmori(){
     const pool = [
       '胸の空が晴れるまで、少しずつ重ねよう',
@@ -664,10 +642,12 @@
     'できることから一つずつ。積み上げは裏切らない',
     '迷ったら開く。開けばエンジンがかかる'
   ];
+
   const recentLines = []; // 直近5件で重複防止
   const lastSpeaker = { name: null };
   const INTRO = ['よし、','さて、','静かに深呼吸。','焦らずいこう。','ここからだよ。','今が合図。','まずは1分だけ。'];
   const ENDINGS = ['。','！','。','！','。'];
+
   function makeLine(name){
     let base;
     if(name==='大森元木') base = lineForOmori();
@@ -691,8 +671,10 @@
     lastSpeaker.name = name;
     return base;
   }
+
   let speechTimers=[];
   function clearSpeechTimers(){ speechTimers.forEach(id=>clearTimeout(id)); speechTimers=[]; }
+
   function buildClassroom(){
     clearSpeechTimers();
     const desks=$('#desks'); desks.innerHTML='';
@@ -783,34 +765,40 @@
   $('#load').addEventListener('click',()=>{ const ok=load(); renderProgress(); renderRank(); alert(ok?'読み込みました':'保存データが見つかりません'); });
   $('#toggleCompact').addEventListener('click',()=>{ document.body.classList.toggle('compact'); });
 
-  // 貼り付け取込：タイプ行 or CSV縦一列もOK
+  // ★ 取込前に必ずスキャフォールド
+  function prepareForImport(){ ensureScaffold(); }
+
+  // 貼り付け取込：CSV/縦一列 → ダメならタイプ行
   $('#importPaste').addEventListener('click',()=>{
-    const text = prompt('日付と種別の一覧や、縦一列の表を貼り付け（例: 8/13(日) 休日 など）');
+    const text = prompt('CSV/TSV/縦一列、または「8/13(日) 休日」形式を貼り付け');
     if(!text) return;
     pushHistory();
-    const n = parseTypeImport(text) || importAnyText(text);
+    prepareForImport();
+    const n = importAnyText(text);
     renderProgress(); renderRank();
-    alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした');
+    alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした（見出し・月・書式を確認）');
   });
 
-  // CSV/TSV/TXT取込：堅牢CSV→縦一列の順に自動判別
+  // CSV/TSV/TXT取込
   $('#importFile').addEventListener('change',async (e)=>{
     const f=e.target.files?.[0]; if(!f) return;
     const txt=await f.text();
     pushHistory();
+    prepareForImport();
     const n= importAnyText(txt);
     renderProgress(); renderRank();
     alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした（見出し・当月か要確認）');
     e.target.value='';
   });
 
-  // OCR取込：テキスト化→堅牢CSV or 縦一列 or タイプリストの順
+  // OCR取込
   $('#importImg').addEventListener('change',async (e)=>{
     const f=e.target.files?.[0]; if(!f) return;
     try{
       const text = await ocrImage(f);
       pushHistory();
-      const n = importAnyText(text) || parseTypeImport(text||'');
+      prepareForImport();
+      const n = importAnyText(text);
       renderProgress(); renderRank();
       alert(n?`OCR取込で当月に ${n} 件反映しました`:'文字が認識できないか、当月データが見つかりませんでした');
     }catch(err){
@@ -829,7 +817,6 @@
   $('#fabHome').addEventListener('click',()=> showPage('progress'));
 
   (function init(){
-    // 旧キー移行
     const keyOld=`studyplanner.v14.ocr:${year}-${String(month+1).padStart(2,'0')}`;
     const rawOld=localStorage.getItem(keyOld);
     if(rawOld && !localStorage.getItem(`${KEY}:${year}-${String(month+1).padStart(2,'0')}`)){
