@@ -3,89 +3,102 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Dashboard – 進捗 / クラスメート / ランキング</title>
+<title>Study Planner – 完全版</title>
 <style>
   :root{
-    --color-bg:#f5f7fb; --card-bg:#fff; --bubble-bg:#f7f9fc; --line:#e6ebf3;
-    --text:#1b2430; --muted:#6b7684; --ok:#1a73e8;
-    --color-male:#1E88E5; --color-female:#FB8C00;
+    --bg:#f5f7fb; --card:#fff; --bubble:#f7f9fc; --line:#e6ebf3;
+    --text:#1b2430; --muted:#6b7684; --pri:#1a73e8; --err:#d32f2f;
+    --male:#1E88E5; --female:#FB8C00;
   }
-  *{box-sizing:border-box} body{margin:0;background:var(--color-bg);color:var(--text);
-    font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Sans","Noto Sans JP","Yu Gothic UI","YuGothic",Meiryo,sans-serif}
-  .top{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--line);
-    padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Sans","Noto Sans JP","Yu Gothic UI","YuGothic",Meiryo,sans-serif}
+  .top{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);
+       padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .brand{font-weight:800;margin-right:auto}
   .nav button{padding:8px 10px;border:1px solid var(--line);background:#fff;border-radius:10px;cursor:pointer;min-width:40px;font-weight:700}
   .nav button.active{background:#eef4ff;border-color:#c7d6ff}
   .tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .btn,.file-label{padding:8px 12px;border:1px solid var(--line);background:#fff;border-radius:10px;cursor:pointer}
-  .btn.primary{background:var(--ok);color:#fff;border-color:var(--ok)}
+  .btn.primary{background:var(--pri);color:#fff;border-color:var(--pri)}
   .ghost{background:#fff}
   .sheet-url{width:280px;max-width:70vw;padding:8px 10px;border:1px solid var(--line);border-radius:10px}
+  .alert{position:sticky;top:56px;z-index:19;margin:0;padding:8px 12px;background:#ffecec;color:#b00020;border-bottom:1px solid #ffcdd2;display:none}
   main{padding:16px;max-width:1200px;margin:0 auto}
   .page{display:none}.page.active{display:block}
-  .card{background:var(--card-bg);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
-  .muted{color:var(--muted)}
-  /* 進捗（P） */
-  .progress-grid{width:100%;border-collapse:separate;border-spacing:0}
-  .progress-grid th,.progress-grid td{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left;background:#fff}
-  .progress-grid th{background:#f1f5ff;font-weight:700}
-  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+  .muted{color:var(--muted)} .hint{font-size:13px;color:var(--muted)}
+  /* 進捗テーブル */
+  .grid{width:100%;border-collapse:separate;border-spacing:0}
+  .grid th,.grid td{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left;background:#fff;vertical-align:top}
+  .grid th{background:#f1f5ff;font-weight:700}
   input[type="date"],input[type="text"],select,textarea{padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff}
-  textarea{min-height:42px}
   .row{display:flex;gap:8px;flex-wrap:wrap}
-  /* クラスメート（C） */
+  /* クラスメート */
   .page-2{display:grid;grid-template-columns:1fr 2fr;gap:16px}
-  .list,.words-panel{background:var(--card-bg);border:1px solid var(--line);border-radius:14px;padding:12px}
+  .list,.words{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
   .student{padding:8px 10px;border-radius:10px;background:#fff;border:1px solid var(--line);margin:8px 0}
   .student .name{font-weight:700}
-  .word{padding:8px 10px;margin:6px 0;border-radius:10px;background:var(--bubble-bg);line-height:1.6;border:1px solid var(--line)}
-  .word.male{color:var(--color-male)} .word.female{color:var(--color-female)}
-  /* ランキング（T） */
-  .rank-section{background:var(--card-bg);border:1px solid var(--line);border-radius:14px;padding:12px}
+  .word{padding:8px 10px;margin:6px 0;border-radius:10px;background:var(--bubble);line-height:1.6;border:1px solid var(--line)}
+  .word.male{color:var(--male)} .word.female{color:var(--female)}
+  /* ランキング */
+  .rank{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
   .rank-list{column-width:240px;column-gap:16px;list-style:none;margin:0;padding:0}
   .rank-list li{break-inside:avoid;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0;display:block}
-  .rank-list .male{border-left:4px solid var(--color-male)} .rank-list .female{border-left:4px solid var(--color-female)}
+  .rank-list .male{border-left:4px solid var(--male)} .rank-list .female{border-left:4px solid var(--female)}
   .rank-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .rank-no{font-weight:800;min-width:3.5em}
-  @media (max-width:820px){.page-2{grid-template-columns:1fr}}
-  .hint{font-size:13px;color:var(--muted)}
+  /* カレンダー */
+  .cal-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .cal-head h2{margin:0 8px 0 0}
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+  .dow{font-weight:700;color:#3b4557}
+  .day{background:#fff;border:1px solid var(--line);border-radius:10px;min-height:96px;padding:8px;display:flex;flex-direction:column}
+  .day .date{font-weight:700;margin-bottom:4px}
+  .day .pill{display:inline-block;padding:2px 6px;margin:2px 2px 0 0;border-radius:999px;font-size:12px;border:1px solid var(--line);background:#f7faff}
+  .pill.L{background:#e3f2fd} .pill.R{background:#fff3e0}
+  .pill.V{background:#e8f5e9}
+  .none{opacity:.35}
+  .legend{display:flex;gap:8px;flex-wrap:wrap}
+  .badge{display:inline-block;padding:2px 6px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:12px}
+  .badge.L{background:#e3f2fd} .badge.R{background:#fff3e0} .badge.V{background:#e8f5e9}
+  @media (max-width:860px){.page-2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <header class="top">
-  <div class="brand">Dashboard</div>
+  <div class="brand">Study Planner</div>
   <nav class="nav">
-    <button id="btn-home" class="active" title="ホーム">Home</button>
-    <button id="btn-progress" title="進捗">P</button>
-    <button id="btn-classmates" title="クラスメート">C</button>
-    <button id="btn-test" title="テスト（ポイント順位）">T</button>
+    <button id="nav-home" class="active">Home</button>
+    <button id="nav-cal">Cal</button>
+    <button id="nav-progress">P</button>
+    <button id="nav-classmates">C</button>
+    <button id="nav-test">T</button>
   </nav>
   <div class="tools">
     <button id="btn-load" class="btn">読み込み</button>
     <button id="btn-save" class="btn">保存</button>
-
     <label class="file-label" for="csv-students">生徒CSV</label>
     <input id="csv-students" type="file" accept=".csv,text/csv" style="display:none">
-
     <label class="file-label" for="csv-progress">進捗CSV</label>
     <input id="csv-progress" type="file" accept=".csv,text/csv" style="display:none">
-
-    <input id="sheet-url" class="sheet-url" placeholder="公開CSV URL（生徒CSV）">
-    <button id="btn-sync-sheets" class="btn ghost">URL取り込み</button>
+    <input id="sheet-url" class="sheet-url" placeholder="公開CSV URL（生徒 or 進捗 CSV）">
+    <button id="btn-sync" class="btn ghost">URL取込</button>
+    <button id="btn-demo" class="btn ghost">デモ投入</button>
   </div>
 </header>
+<div id="alert" class="alert"></div>
 
 <main>
   <!-- Home -->
-  <section id="page-home" class="page active">
+  <section id="home" class="page active">
     <div class="card">
       <h2>ようこそ</h2>
-      <p class="muted">上のボタンでページ切替（<b>P</b>=進捗、<b>C</b>=クラスメート、<b>T</b>=ランキング）。データはローカル保存（localStorage）。</p>
+      <p class="muted">Cal=月間カレンダー、P=進捗一覧、C=クラスメート（褒め言葉）、T=ポイント順位。保存はブラウザ内（localStorage）。</p>
       <ul class="hint">
-        <li>生徒CSV…<code>id,name,gender,points,comment</code>（genderは <b>male/female</b>）</li>
+        <li>生徒CSV…<code>id,name,gender,points,comment</code>（gender: <b>male/female</b>）</li>
         <li>進捗CSV…<code>date,type,mainRange,minRange,result,memo</code></li>
-        <li>GoogleスプレッドシートはCSV公開URLで取り込み可（/export?format=csv）</li>
+        <li>Sheetsは「リンク公開CSV（/export?format=csv）」のURLを入力して「URL取込」</li>
       </ul>
     </div>
     <div class="card">
@@ -94,80 +107,93 @@
     </div>
   </section>
 
-  <!-- 進捗（P） -->
-  <section id="page-progress" class="page">
+  <!-- Calendar -->
+  <section id="cal" class="page">
     <div class="card">
-      <h2>進捗</h2>
-      <div class="toolbar">
-        <div class="row">
-          <input id="pg-date" type="date">
-          <select id="pg-type">
-            <option value="学習">学習</option>
-            <option value="復習">復習</option>
-            <option value="休み">休み</option>
-            <option value="テスト">テスト</option>
-          </select>
-          <input id="pg-main" type="text" placeholder="メイン範囲（例：18, 23）">
-          <input id="pg-min" type="text" placeholder="最低範囲（例：18）">
-          <input id="pg-result" type="text" placeholder="結果（例：18）">
-          <input id="pg-memo" type="text" placeholder="メモ">
-          <button id="pg-add" class="btn primary">追加</button>
-          <button id="pg-clear" class="btn ghost">全削除（確認有）</button>
+      <div class="cal-head">
+        <h2 id="cal-title">カレンダー</h2>
+        <button id="cal-prev" class="btn">◀︎</button>
+        <button id="cal-today" class="btn">今月</button>
+        <button id="cal-next" class="btn">▶︎</button>
+        <div class="legend">
+          <span class="badge L">学習</span>
+          <span class="badge R">復習</span>
+          <span class="badge V">休み</span>
         </div>
       </div>
-      <div class="hint">※ 追加・保存するとHomeにも反映されます。</div>
+      <div class="cal" id="cal-grid"></div>
+    </div>
+  </section>
+
+  <!-- Progress -->
+  <section id="progress" class="page">
+    <div class="card">
+      <h2>進捗</h2>
+      <div class="row" style="margin-bottom:10px">
+        <input id="pg-date" type="date">
+        <select id="pg-type">
+          <option value="学習">学習</option>
+          <option value="復習">復習</option>
+          <option value="休み">休み</option>
+          <option value="テスト">テスト</option>
+        </select>
+        <input id="pg-main" type="text" placeholder="メイン範囲（例：18,23）">
+        <input id="pg-min" type="text" placeholder="最低範囲（例：18）">
+        <input id="pg-result" type="text" placeholder="結果（例：18）">
+        <input id="pg-memo" type="text" placeholder="メモ">
+        <button id="pg-add" class="btn primary">追加</button>
+        <button id="pg-clear" class="btn ghost">全削除</button>
+      </div>
     </div>
     <div class="card">
-      <table class="progress-grid" id="progress-table">
+      <table class="grid" id="pg-table">
         <thead>
-          <tr>
-            <th style="width:110px">日付</th><th style="width:90px">種別</th><th>メイン範囲</th><th>最低範囲</th><th style="width:90px">結果</th><th>メモ</th>
-          </tr>
+          <tr><th>日付</th><th>種別</th><th>メイン範囲</th><th>最低範囲</th><th>結果</th><th>メモ</th></tr>
         </thead>
-        <tbody id="progress-body"></tbody>
+        <tbody id="pg-body"></tbody>
       </table>
     </div>
   </section>
 
-  <!-- クラスメート（C） -->
-  <section id="page-classmates" class="page">
+  <!-- Classmates -->
+  <section id="classmates" class="page">
     <div class="page-2">
       <div class="list">
         <h3>メンバー</h3>
         <div id="student-list"></div>
       </div>
-      <div class="words-panel">
+      <div class="words">
         <h3>クラスメートの言葉（右側に拡張表示）</h3>
         <div id="words-list"></div>
       </div>
     </div>
   </section>
 
-  <!-- ランキング（T） -->
-  <section id="page-test" class="page">
-    <section class="rank-section">
+  <!-- Ranking -->
+  <section id="test" class="page">
+    <div class="rank">
       <h2>ポイント順位</h2>
-      <ol class="rank-list" id="rank-list"></ol>
-    </section>
+      <ol id="rank-list" class="rank-list"></ol>
+    </div>
   </section>
 </main>
 
 <script>
-/* ========= 基本ユーティリティ ========= */
-const STORAGE_KEY="app:data:v2"; // v2: 進捗対応
-function notifyError(err,msg="処理に失敗しました"){ console.error(err); alert(`${msg}\n${err?.message??""}`); }
-function assertHasRows(rows,msg="データがありませんでした"){ if(!Array.isArray(rows)||rows.length===0) throw new Error(msg); }
-function escapeHtml(s){ return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
+/* ====== ユーティリティ ====== */
+const STORAGE_KEY="study-planner:v3";
+function showAlert(msg){ const a=document.getElementById("alert"); a.textContent=msg; a.style.display="block"; setTimeout(()=>a.style.display="none", 4000); }
+function okId(){ try{ return crypto.randomUUID(); }catch{ return "id_"+Math.random().toString(36).slice(2,10); } }
+function esc(s){ return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
 
-/* ========= 状態 ========= */
+/* ====== 状態 ====== */
 const state = {
   students: [],   // {id,name,gender('male'|'female'),points:number,comment}
   progress: [],   // {date,type,mainRange,minRange,result,memo}
   messages: []
 };
 
-/* ========= 褒め言葉（重複抑制＋ランダム） ========= */
-const praisePool = {
+/* ====== 褒め言葉 ====== */
+const praisePool={
   精度:["正確無比","丁寧で緻密","ブレがない","詰めが美しい","安定感抜群"],
   速度:["展開が速い","反応が鋭い","切り替えが早い","テンポが良い","進みが軽快"],
   発想:["着眼点が鋭い","発想が柔軟","切り口が新しい","発見が多い","視点が広い"],
@@ -178,101 +204,122 @@ const usedToday=new Set(); let praiseOrder=Object.keys(praisePool);
 function nextPraise(){
   praiseOrder.push(praiseOrder.shift());
   const cat=praiseOrder[0];
-  const candidates=praisePool[cat].filter(p=>!usedToday.has(p));
-  if(candidates.length===0){ usedToday.clear(); return nextPraise(); }
-  const p=candidates[Math.floor(Math.random()*candidates.length)];
+  const cands=praisePool[cat].filter(p=>!usedToday.has(p));
+  if(cands.length===0){ usedToday.clear(); return nextPraise(); }
+  const p=cands[Math.floor(Math.random()*cands.length)];
   usedToday.add(p); return p;
 }
 
-/* ========= CSV（簡易/BOM対応） ========= */
-function parseCSV(text){
+/* ====== CSV（クォート対応） ====== */
+function parseCSVQuoted(text){
+  // BOM除去
   if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
-  const lines=text.replace(/\r\n?/g,"\n").split("\n").filter(l=>l.trim()!=="");
-  const header=lines[0].split(",").map(s=>s.trim());
-  const rows=lines.slice(1).map(line=>{
-    const cells=line.split(",").map(s=>s.trim());
-    const obj={}; header.forEach((h,i)=>obj[h]=cells[i]??"");
-    return obj;
+  const rows=[]; let i=0, cur=[], cell="", inQ=false;
+  function pushCell(){ cur.push(cell); cell=""; }
+  function pushRow(){ rows.push(cur); cur=[]; }
+  while(i<text.length){
+    const ch=text[i];
+    if(inQ){
+      if(ch==='"' && text[i+1]==='"'){ cell+='"'; i+=2; continue; }
+      if(ch==='"' ){ inQ=false; i++; continue; }
+      cell+=ch; i++; continue;
+    }else{
+      if(ch==='"'){ inQ=true; i++; continue; }
+      if(ch===','){ pushCell(); i++; continue; }
+      if(ch==='\r'){ i++; continue; }
+      if(ch==='\n'){ pushCell(); pushRow(); i++; continue; }
+      cell+=ch; i++; continue;
+    }
+  }
+  // 最終セル
+  pushCell(); pushRow();
+  // 空行除去
+  return rows.filter(r=>r.join("").trim()!=="");
+}
+function parseCsvToObjects(text){
+  const rows=parseCSVQuoted(text);
+  const header=rows[0].map(s=>s.trim());
+  const objs=rows.slice(1).map(r=>{
+    const o={}; header.forEach((h,idx)=>o[h]=r[idx]?.trim()??""); return o;
   });
-  return {header,rows};
+  return {header,rows:objs};
 }
 function isStudentHeader(h){ const need=["id","name","gender","points","comment"]; return need.every(x=>h.includes(x)); }
 function isProgressHeader(h){ const need=["date","type","mainRange","minRange","result","memo"]; return need.every(x=>h.includes(x)); }
+
+/* ====== マッピング ====== */
 function mapStudents(rows){
   return rows.map(r=>({
-    id:String(r.id??crypto.randomUUID()),
-    name:r.name??"",
+    id:String(r.id||okId()),
+    name:r.name||"",
     gender:(r.gender==="female"?"female":"male"),
-    points:Number(r.points??0),
-    comment:r.comment??""
+    points:Number(r.points||0),
+    comment:r.comment||""
   }));
 }
 function mapProgress(rows){
   return rows.map(r=>({
-    date:r.date??"", type:r.type??"",
-    mainRange:r.mainRange??"", minRange:r.minRange??"",
-    result:r.result??"", memo:r.memo??""
+    date:r.date||"", type:r.type||"",
+    mainRange:r.mainRange||"", minRange:r.minRange||"",
+    result:r.result||"", memo:r.memo||""
   }));
 }
 
-/* ========= 永続化 ========= */
+/* ====== 永続化 ====== */
 function save(){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({students:state.students,progress:state.progress,messages:state.messages}));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   alert("保存しました");
 }
 function load(){
   const raw=localStorage.getItem(STORAGE_KEY);
   if(!raw) throw new Error("保存データが見つかりません");
   const data=JSON.parse(raw);
-  state.students=data.students??[];
-  state.progress=data.progress??[];
-  state.messages=data.messages??[];
+  state.students=data.students||[];
+  state.progress=data.progress||[];
+  state.messages=data.messages||[];
 }
 
-/* ========= レンダリング ========= */
-function setActive(whichId){
+/* ====== レンダリング ====== */
+function setActive(id){
   document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
-  document.getElementById(whichId).classList.add("active");
+  document.getElementById(id).classList.add("active");
   document.querySelectorAll(".nav button").forEach(b=>b.classList.remove("active"));
-  const map = { "page-home":"btn-home", "page-progress":"btn-progress", "page-classmates":"btn-classmates", "page-test":"btn-test" };
-  document.getElementById(map[whichId]).classList.add("active");
-  if(whichId==="page-progress"){ renderProgress(); }
-  if(whichId==="page-classmates"){ renderStudents(); renderWords(); }
-  if(whichId==="page-test"){ renderRanking(); }
-  if(whichId==="page-home"){ renderHomeProgress(); }
+  const map={home:"nav-home",cal:"nav-cal",progress:"nav-progress",classmates:"nav-classmates",test:"nav-test"};
+  document.getElementById(map[id]).classList.add("active");
+  if(id==="home") renderHome();
+  if(id==="progress") renderProgress();
+  if(id==="classmates"){ renderStudents(); renderWords(); }
+  if(id==="test") renderRanking();
+  if(id==="cal") renderCalendar();
 }
-function renderHomeProgress(){
+function renderHome(){
   const host=document.getElementById("home-progress");
   const latest=[...state.progress].sort((a,b)=> (b.date||"").localeCompare(a.date||"")).slice(0,10);
   if(latest.length===0){ host.innerHTML='<div class="muted">進捗データがありません</div>'; return; }
-  host.innerHTML = `<table class="progress-grid">
+  host.innerHTML = `<table class="grid">
     <thead><tr><th>日付</th><th>種別</th><th>メイン範囲</th><th>最低範囲</th><th>結果</th><th>メモ</th></tr></thead>
     <tbody>${
-      latest.map(r=>`<tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.type)}</td><td>${escapeHtml(r.mainRange)}</td><td>${escapeHtml(r.minRange)}</td><td>${escapeHtml(r.result)}</td><td>${escapeHtml(r.memo)}</td></tr>`).join("")
+      latest.map(r=>`<tr><td>${esc(r.date)}</td><td>${esc(r.type)}</td><td>${esc(r.mainRange)}</td><td>${esc(r.minRange)}</td><td>${esc(r.result)}</td><td>${esc(r.memo)}</td></tr>`).join("")
     }</tbody></table>`;
 }
 function renderProgress(){
-  const body=document.getElementById("progress-body");
+  const body=document.getElementById("pg-body");
   if(state.progress.length===0){ body.innerHTML='<tr><td colspan="6" class="muted">進捗データがありません</td></tr>'; return; }
-  const rows=[...state.progress].sort((a,b)=> (a.date||"").localeCompare(b.date||"")); // 古い→新しい
-  body.innerHTML = rows.map(r=>`
-    <tr>
-      <td>${escapeHtml(r.date)}</td>
-      <td>${escapeHtml(r.type)}</td>
-      <td>${escapeHtml(r.mainRange)}</td>
-      <td>${escapeHtml(r.minRange)}</td>
-      <td>${escapeHtml(r.result)}</td>
-      <td>${escapeHtml(r.memo)}</td>
-    </tr>`).join("");
+  const rows=[...state.progress].sort((a,b)=> (a.date||"").localeCompare(b.date||""));
+  body.innerHTML = rows.map(r=>`<tr>
+    <td>${esc(r.date)}</td><td>${esc(r.type)}</td>
+    <td>${esc(r.mainRange)}</td><td>${esc(r.minRange)}</td>
+    <td>${esc(r.result)}</td><td>${esc(r.memo)}</td>
+  </tr>`).join("");
 }
 function renderStudents(){
   const host=document.getElementById("student-list");
   if(state.students.length===0){ host.innerHTML='<div class="muted">メンバー未登録</div>'; return; }
   host.innerHTML = state.students.map(s=>`
     <div class="student">
-      <div class="name">${escapeHtml(s.name)}</div>
+      <div class="name">${esc(s.name)}</div>
       <div class="muted">${s.gender==="female"?"女性":"男性"}／${s.points} pt</div>
-      ${s.comment?`<div class="muted">メモ：${escapeHtml(s.comment)}</div>`:""}
+      ${s.comment?`<div class="muted">メモ：${esc(s.comment)}</div>`:""}
     </div>`).join("");
 }
 function renderWords(){
@@ -281,94 +328,136 @@ function renderWords(){
   const out=[];
   state.students.forEach(s=>{
     const p1=nextPraise();
-    const p2 = Math.random()<0.35 ? `・${extraPraise[Math.floor(Math.random()*extraPraise.length)]}` : "";
-    const c  = s.comment ? `（${escapeHtml(s.comment)}）` : "";
-    out.push(`<div class="word ${s.gender==='female'?'female':'male'}"><strong>${escapeHtml(s.name)}</strong>：${p1}${p2}${c}</div>`);
+    const p2=Math.random()<0.35?`・${extraPraise[Math.floor(Math.random()*extraPraise.length)]}`:"";
+    const c=s.comment?`（${esc(s.comment)}）`:"";
+    out.push(`<div class="word ${s.gender==='female'?'female':'male'}"><strong>${esc(s.name)}</strong>：${p1}${p2}${c}</div>`);
   });
   host.innerHTML=out.join("");
 }
 function renderRanking(){
   const list=document.getElementById("rank-list");
   if(state.students.length===0){ list.innerHTML='<li><div class="muted">データなし</div></li>'; return; }
-  const ranked=[...state.students].sort((a,b)=> b.points - a.points);
+  const ranked=[...state.students].sort((a,b)=> b.points-a.points);
   list.innerHTML = ranked.map((s,i)=>`
     <li class="${s.gender==='female'?'female':'male'}">
       <div class="rank-row">
         <div class="rank-no">${i+1}位</div>
-        <div class="grow"><strong>${escapeHtml(s.name)}</strong></div>
+        <div class="grow"><strong>${esc(s.name)}</strong></div>
         <div>${s.points} pt</div>
       </div>
     </li>`).join("");
 }
 
-/* ========= 取り込み ========= */
-async function importFromSheetCsv(url){
-  const res=await fetch(url,{cache:"no-store"}); if(!res.ok) throw new Error(`HTTP ${res.status}`);
-  const text=await res.text();
-  const {header,rows}=parseCSV(text);
-  if(isStudentHeader(header)){ mergeStudents(mapStudents(rows)); afterImport(); return; }
-  if(isProgressHeader(header)){ mergeProgress(mapProgress(rows)); afterImport(); return; }
-  throw new Error("CSVヘッダが不明です（生徒CSV or 進捗CSV 形式にしてください）");
+/* ====== カレンダー ====== */
+let calYear, calMonth; // month: 0-11
+function setCalToToday(){ const d=new Date(); calYear=d.getFullYear(); calMonth=d.getMonth(); }
+function ymd(dt){ const y=dt.getFullYear(), m=String(dt.getMonth()+1).padStart(2,"0"), d=String(dt.getDate()).padStart(2,"0"); return `${y}-${m}-${d}`; }
+function renderCalendar(){
+  if(calYear==null) setCalToToday();
+  const title=document.getElementById("cal-title");
+  title.textContent = `${calYear}年 ${calMonth+1}月`;
+  const grid=document.getElementById("cal-grid");
+  grid.innerHTML="";
+  // 曜日ヘッダ
+  const dows=["日","月","火","水","木","金","土"];
+  dows.forEach(w=>{
+    const h=document.createElement("div"); h.className="dow"; h.textContent=w; grid.appendChild(h);
+  });
+  // 月の開始
+  const first=new Date(calYear, calMonth, 1);
+  const start=new Date(first); start.setDate(first.getDate() - ((first.getDay()+7)%7)); // 日曜始まり
+  for(let i=0;i<42;i++){ // 6週
+    const dt=new Date(start); dt.setDate(start.getDate()+i);
+    const cell=document.createElement("div"); cell.className="day";
+    const inMonth = dt.getMonth()===calMonth;
+    if(!inMonth) cell.classList.add("none");
+    const n=document.createElement("div"); n.className="date"; n.textContent=dt.getDate();
+    cell.appendChild(n);
+    // その日の進捗を表示
+    const key=ymd(dt);
+    const items=state.progress.filter(r=>r.date===key);
+    items.forEach(it=>{
+      const p=document.createElement("span");
+      const t=it.type;
+      p.className="pill "+(t==="学習"?"L":t==="復習"?"R":t==="休み"?"V":"");
+      const label = it.type + (it.mainRange?`:${it.mainRange}`:"");
+      p.textContent=label;
+      cell.appendChild(p);
+    });
+    grid.appendChild(cell);
+  }
 }
-async function importCsvFile(file,kind){
+
+/* ====== 取り込み ====== */
+async function importFromUrl(url){
+  const res=await fetch(url,{cache:"no-store"});
+  if(!res.ok) throw new Error(`HTTP ${res.status}`);
+  const text=await res.text();
+  const {header,rows}=parseCsvToObjects(text);
+  applyImported(header,rows);
+}
+async function importCsvFile(file, kindHint){
   const text=await file.text();
-  const {header,rows}=parseCSV(text);
-  if(kind==="students" || isStudentHeader(header)){
+  const {header,rows}=parseCsvToObjects(text);
+  applyImported(header,rows,kindHint);
+}
+function applyImported(header,rows,kindHint){
+  if(kindHint==="students" || isStudentHeader(header)){
     mergeStudents(mapStudents(rows)); afterImport(); return;
   }
-  if(kind==="progress" || isProgressHeader(header)){
+  if(kindHint==="progress" || isProgressHeader(header)){
     mergeProgress(mapProgress(rows)); afterImport(); return;
   }
-  throw new Error("CSVヘッダが不明です（生徒CSV or 進捗CSV 形式にしてください）");
+  throw new Error("CSVヘッダが不明です（生徒 or 進捗 形式）");
 }
 function mergeStudents(incoming){
   const map=new Map(state.students.map(s=>[s.id,s]));
   incoming.forEach(s=>map.set(s.id,s));
-  state.students=Array.from(map.values());
+  state.students=[...map.values()];
 }
 function mergeProgress(incoming){
-  // 同一(date,type,mainRange,minRange,result,memo) を重複とみなしてマージ
   const keyOf = r=>[r.date,r.type,r.mainRange,r.minRange,r.result,r.memo].join("|");
   const map=new Map(state.progress.map(r=>[keyOf(r),r]));
   incoming.forEach(r=>map.set(keyOf(r),r));
-  state.progress=Array.from(map.values());
+  state.progress=[...map.values()];
 }
 function afterImport(){
-  // 現在ページに合わせて反映
-  const activeId=document.querySelector(".page.active")?.id;
-  if(activeId==="page-progress"){ renderProgress(); }
-  if(activeId==="page-classmates"){ renderStudents(); renderWords(); }
-  if(activeId==="page-test"){ renderRanking(); }
-  if(activeId==="page-home"){ renderHomeProgress(); }
+  const active=document.querySelector(".page.active")?.id;
+  if(active==="home") renderHome();
+  if(active==="cal") renderCalendar();
+  if(active==="progress") renderProgress();
+  if(active==="classmates"){ renderStudents(); renderWords(); }
+  if(active==="test") renderRanking();
   alert("取り込み完了");
 }
 
-/* ========= イベント ========= */
-document.getElementById("btn-home").onclick=()=>setActive("page-home");
-document.getElementById("btn-progress").onclick=()=>setActive("page-progress");
-document.getElementById("btn-classmates").onclick=()=>setActive("page-classmates");
-document.getElementById("btn-test").onclick=()=>setActive("page-test");
+/* ====== イベント ====== */
+document.getElementById("nav-home").onclick = ()=>setActive("home");
+document.getElementById("nav-cal").onclick = ()=>setActive("cal");
+document.getElementById("nav-progress").onclick = ()=>setActive("progress");
+document.getElementById("nav-classmates").onclick = ()=>setActive("classmates");
+document.getElementById("nav-test").onclick = ()=>setActive("test");
 
-document.getElementById("btn-save").onclick=()=>{ try{ save(); }catch(e){ notifyError(e,"保存に失敗しました"); } };
-document.getElementById("btn-load").onclick=()=>{ try{ load(); renderHomeProgress(); renderProgress(); renderStudents(); renderWords(); renderRanking(); alert("読み込み完了"); }catch(e){ notifyError(e,"読み込みに失敗しました"); } };
+document.getElementById("btn-save").onclick=()=>{ try{ save(); }catch(e){ showAlert("保存に失敗: "+e.message); } };
+document.getElementById("btn-load").onclick=()=>{ try{ load(); renderHome(); renderCalendar(); renderProgress(); renderStudents(); renderWords(); renderRanking(); alert("読み込み完了"); }catch(e){ showAlert("読み込みに失敗: "+e.message); } };
 
-document.getElementById("csv-students").addEventListener("change",async e=>{
+document.getElementById("csv-students").addEventListener("change", async e=>{
   try{ const f=e.target.files?.[0]; if(!f) throw new Error("生徒CSVが選択されていません"); await importCsvFile(f,"students"); e.target.value=""; }
-  catch(err){ notifyError(err,"生徒CSV取り込みに失敗しました"); }
+  catch(err){ showAlert("生徒CSV取込失敗: "+err.message); }
 });
-document.getElementById("csv-progress").addEventListener("change",async e=>{
+document.getElementById("csv-progress").addEventListener("change", async e=>{
   try{ const f=e.target.files?.[0]; if(!f) throw new Error("進捗CSVが選択されていません"); await importCsvFile(f,"progress"); e.target.value=""; }
-  catch(err){ notifyError(err,"進捗CSV取り込みに失敗しました"); }
+  catch(err){ showAlert("進捗CSV取込失敗: "+err.message); }
 });
-document.getElementById("btn-sync-sheets").onclick=async ()=>{
+document.getElementById("btn-sync").onclick=async ()=>{
   try{
     const url=document.getElementById("sheet-url").value.trim();
     if(!url) throw new Error("公開CSVのURLを入力してください");
-    await importFromSheetCsv(url);
-  }catch(err){ notifyError(err,"URL取り込みに失敗しました"); }
+    await importFromUrl(url);
+  }catch(err){ showAlert("URL取込失敗: "+err.message); }
 };
 
-/* ========= 進捗追加/削除 ========= */
+/* 進捗追加/削除 */
 document.getElementById("pg-add").onclick=()=>{
   try{
     const r={
@@ -381,22 +470,56 @@ document.getElementById("pg-add").onclick=()=>{
     };
     if(!r.date) throw new Error("日付は必須です");
     state.progress.push(r);
-    renderProgress(); renderHomeProgress();
+    renderProgress(); renderHome(); renderCalendar();
     alert("進捗を追加しました");
-  }catch(err){ notifyError(err,"進捗の追加に失敗しました"); }
+  }catch(err){ showAlert("進捗追加失敗: "+err.message); }
 };
 document.getElementById("pg-clear").onclick=()=>{
   if(!confirm("進捗を全て削除します。よろしいですか？")) return;
-  state.progress=[]; renderProgress(); renderHomeProgress(); alert("進捗を全削除しました");
+  state.progress=[]; renderProgress(); renderHome(); renderCalendar();
+  alert("進捗を全削除しました");
 };
 
-/* ========= 初期化 ========= */
-(function initToday(){
-  const d=new Date(); const yyyy=d.getFullYear(); const mm=String(d.getMonth()+1).padStart(2,"0"); const dd=String(d.getDate()).padStart(2,"0");
-  const today=`${yyyy}-${mm}-${dd}`;
-  const el=document.getElementById("pg-date"); if(el && !el.value) el.value=today;
+/* カレンダー操作 */
+document.getElementById("cal-prev").onclick=()=>{ if(calYear==null)setCalToToday(); calMonth--; if(calMonth<0){calMonth=11; calYear--;} renderCalendar(); };
+document.getElementById("cal-next").onclick=()=>{ if(calYear==null)setCalToToday(); calMonth++; if(calMonth>11){calMonth=0; calYear++;} renderCalendar(); };
+document.getElementById("cal-today").onclick=()=>{ setCalToToday(); renderCalendar(); };
+
+/* デモ投入（空のときの見た目確認用） */
+document.getElementById("btn-demo").onclick=()=>{
+  if(!confirm("デモデータを投入しますか？既存データに追加されます。")) return;
+  // 生徒
+  const demoS=[
+    {id:okId(),name:"山田太郎",gender:"male",points:120,comment:"すごい集中力"},
+    {id:okId(),name:"田中花子",gender:"female",points:140,comment:"丁寧で正確"},
+    {id:okId(),name:"佐藤健",gender:"male",points:110,comment:"発想が柔軟"},
+    {id:okId(),name:"鈴木愛",gender:"female",points:150,comment:"段取りが良い"}
+  ];
+  mergeStudents(demoS);
+  // 進捗（当月中心）
+  const d=new Date(); const y=d.getFullYear(); const m=d.getMonth()+1;
+  function dd(n){ return String(n).padStart(2,"0"); }
+  const demoP=[
+    {date:`${y}-${dd(m)}-01`,type:"学習",mainRange:"18,23",minRange:"18",result:"18",memo:"スタートは勢いだ！"},
+    {date:`${y}-${dd(m)}-02`,type:"休み",mainRange:"",minRange:"",result:"",memo:"休むのも戦略"},
+    {date:`${y}-${dd(m)}-03`,type:"学習",mainRange:"24,25",minRange:"24",result:"24",memo:"昨日の自分を超えよう"},
+    {date:`${y}-${dd(m)}-04`,type:"復習",mainRange:"18〜25",minRange:"",result:"",memo:"磨く日"},
+    {date:`${y}-${dd(m)}-05`,type:"学習",mainRange:"26,29",minRange:"26",result:"26",memo:"積み上げ"},
+    {date:`${y}-${dd(m)}-06`,type:"テスト",mainRange:"小テスト",minRange:"",result:"80/100",memo:"次は85点"}
+  ];
+  mergeProgress(demoP);
+  renderHome(); renderCalendar(); renderProgress(); renderStudents(); renderWords(); renderRanking();
+  alert("デモデータを追加しました");
+};
+
+/* 初期化 */
+(function init(){
+  // 今日を進捗入力の既定日に
+  const d=new Date(); const yyyy=d.getFullYear(), mm=String(d.getMonth()+1).padStart(2,"0"), dd=String(d.getDate()).padStart(2,"0");
+  const today=`${yyyy}-${mm}-${dd}`; const el=document.getElementById("pg-date"); if(el && !el.value) el.value=today;
+  setCalToToday();
+  renderHome(); renderCalendar();
 })();
-renderHomeProgress();
 </script>
 </body>
 </html>
