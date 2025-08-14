@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Study Planner – 1ヶ月表示（学習/休日トグル＋貼付/CSV/OCR）& C(🏫) & T(🏆)</title>
+<title>Study Planner – 月間進捗＋C(🏫)＋T(🏆)</title>
 
 <!-- 画像OCR（iPad完結） -->
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
@@ -15,6 +15,10 @@
     --row-gray-bg:#b0a89f; --row-gray-text:#000000;
     --header-bg:#ffffff; --header-shadow:0 6px 12px rgba(0,0,0,.06);
     --accent:#2563eb;
+
+    --male:#2563eb;        /* 男性=青 */
+    --female:#f97316;      /* 女性=オレンジ */
+
     --board:#0f3b3f; --board-frame:#2f4f4f; --desk:#ffffff; --room:#f7fafc;
 
     --bubble-gen-bg:#f4f8ff;   --bubble-gen-bd:#d6e6ff;
@@ -38,6 +42,9 @@
   .tabs{display:flex;gap:8px;margin:6px 0 10px}
   .tab{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:#fff;cursor:pointer}
   .tab.active{background:#eef2ff;border-color:#c7d2fe}
+
+  /* ページ操作（進む/戻る） */
+  .pager{display:flex;gap:8px;align-items:center;margin:6px 0 6px}
 
   /* 今日バナー */
   .today-banner{
@@ -83,17 +90,13 @@
 
   /* C：教室ページ */
   .blackboard{border-radius:10px;border:2px solid var(--board-frame);background:var(--board);color:#e0f2f1;padding:10px 12px;font-weight:600;margin-bottom:10px}
-  .room{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--room);max-height:80vh;overflow:auto}
-  .desks{
-    display:grid;gap:12px;
-    grid-template-columns:repeat(3, minmax(0,1fr));
-  }
-  .desk{
-    background:var(--desk);border:1px solid var(--line);border-radius:12px;padding:10px;
-    min-height:110px;display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden
-  }
+  .room{border:1px solid var(--line);border-radius:12px;padding:14px;background:#f7fafc;max-height:80vh;overflow:auto}
+  .desks{display:grid;gap:12px;grid-template-columns:repeat(3, minmax(0,1fr))}
+  .desk{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;min-height:110px;display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden}
   .desk .name{font-weight:700}
   .desk .role{font-size:12px;color:#6b7280}
+  .desk.male .name{color:var(--male)}
+  .desk.female .name{color:var(--female)}
 
   .bubble{
     position:absolute;left:8px;right:8px;top:8px;
@@ -101,14 +104,8 @@
     border-radius:12px;padding:8px 10px;font-size:14px;box-shadow:0 6px 12px rgba(0,0,0,.06);
     display:none;max-width:unset;white-space:pre-line
   }
-  .bubble::after{
-    content:"";position:absolute;left:22px;bottom:-10px;
-    border-width:10px 10px 0 10px;border-style:solid;border-color:var(--bubble-gen-bd) transparent transparent transparent;
-  }
-  .bubble::before{
-    content:"";position:absolute;left:22px;bottom:-9px;
-    border-width:9px 9px 0 9px;border-style:solid;border-color:var(--bubble-gen-bg) transparent transparent transparent;
-  }
+  .bubble::after{content:"";position:absolute;left:22px;bottom:-10px;border-width:10px 10px 0 10px;border-style:solid;border-color:var(--bubble-gen-bd) transparent transparent transparent}
+  .bubble::before{content:"";position:absolute;left:22px;bottom:-9px;border-width:9px 9px 0 9px;border-style:solid;border-color:var(--bubble-gen-bg) transparent transparent transparent}
   .bubble.famous{background:var(--bubble-fam-bg);border-color:var(--bubble-fam-bd)}
   .bubble.famous::after{border-top-color:var(--bubble-fam-bd)}
   .bubble.famous::before{border-top-color:var(--bubble-fam-bg)}
@@ -117,7 +114,7 @@
 
   /* T：ランキングページ */
   .rank-card{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff}
-  .rank-grid{column-width:240px;column-gap:16px;}
+  .rank-grid{column-width:240px;column-gap:16px}
   .rank-item{break-inside:avoid;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0;background:#fff;display:block}
   .rank-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .rank-no{font-weight:800;min-width:3.5em}
@@ -139,8 +136,14 @@
   <!-- タブ -->
   <div class="tabs">
     <button id="tabProgress" class="tab active">進捗</button>
-    <button id="tabClass" class="tab">C 🏫</button>
-    <button id="tabRank" class="tab">T 🏆</button>
+    <button id="tabClass" class="tab" title="学校">C 🏫</button>
+    <button id="tabRank" class="tab" title="順位">T 🏆</button>
+  </div>
+
+  <!-- ページ進む/戻る -->
+  <div class="pager">
+    <button id="pagePrev">◀ 戻る</button>
+    <button id="pageNext">進む ▶</button>
   </div>
 
   <!-- ===== Page 1: 進捗 ===== -->
@@ -220,52 +223,32 @@
     </div>
   </section>
 
-  <!-- 右下：🐹ホームへ -->
+  <!-- 右下：🐹ホームへ（右上📍は無し） -->
   <button class="fab" id="fabHome" title="ホームへ"><span>🐹</span></button>
 
 <script>
 (function(){
   'use strict';
-  const KEY='studyplanner.v14.ocr'; // 互換はv13から自動マージ
+  const KEY='studyplanner.v15.ocr';
   const NAME_KEY='studyplanner.displayName';
 
   let year=(new Date()).getFullYear(), month=(new Date()).getMonth();
   let rows=[]; // {date,type,goal,result,review,color}
 
-  // ==== Undo/Redo（行配列のスナップショット） ====
+  /* ========== Undo/Redo ========== */
   const history = { past:[], future:[] };
-  function snapshot(){
-    // 深いコピー
-    return JSON.parse(JSON.stringify({year,month,rows}));
-  }
-  function pushHistory(){
-    history.past.push(snapshot());
-    history.future.length = 0; // 進むは破棄
-  }
-  function undo(){
-    if(history.past.length===0) return;
-    const cur = snapshot();
-    const prev = history.past.pop();
-    history.future.push(cur);
-    year = prev.year; month = prev.month; rows = prev.rows;
-    renderAll();
-  }
-  function redo(){
-    if(history.future.length===0) return;
-    const cur = snapshot();
-    const nxt = history.future.pop();
-    history.past.push(cur);
-    year = nxt.year; month = nxt.month; rows = nxt.rows;
-    renderAll();
-  }
+  const snapshot = () => JSON.parse(JSON.stringify({year,month,rows}));
+  const pushHistory = () => { history.past.push(snapshot()); history.future.length=0; };
+  function undo(){ if(!history.past.length) return; const cur=snapshot(); const prev=history.past.pop(); history.future.push(cur); ({year,month,rows}=prev); renderAll(); }
+  function redo(){ if(!history.future.length) return; const cur=snapshot(); const nxt=history.future.pop(); history.past.push(cur); ({year,month,rows}=nxt); renderAll(); }
 
+  /* ========== 小ユーティリティ ========== */
   const $=sel=>document.querySelector(sel);
   const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   const fromYmd=s=>{const [y,m,d]=s.split('-').map(Number); return new Date(y, m-1, d);};
   const jpWeek=d=>'日月火水木金土'[d.getDay()];
   const jpDateLabel=s=>{const d=fromYmd(s);return `${d.getMonth()+1}月${d.getDate()}日(${jpWeek(d)})`;};
   function monthDates(y,m){const first=new Date(y,m,1), last=new Date(y,m+1,0), arr=[]; for(let d=new Date(first); d<=last; d.setDate(d.getDate()+1)) arr.push(ymd(d)); return arr;}
-
   function ensureScaffold(){
     const need=new Set(monthDates(year,month));
     const have=new Set(rows.map(r=>r.date));
@@ -274,15 +257,14 @@
   }
   function persist(rec){const i=rows.findIndex(x=>x.date===rec.date); if(i>=0) rows[i]=rec; else rows.push(rec);}
 
-  /* ===== 保存/読込（端末ローカル） ===== */
+  /* ========== ローカル保存/読込 ========== */
   function save(){
     pushHistory();
     const key=`${KEY}:${year}-${String(month+1).padStart(2,'0')}`;
     const data=rows.filter(r=>fromYmd(r.date).getMonth()===month && fromYmd(r.date).getFullYear()===year);
     localStorage.setItem(key, JSON.stringify(data));
     alert('更新しました（この端末のブラウザ内）');
-    // ページ移動はしない
-    renderRank(); // 連動
+    renderRank(); // ページ移動しない
   }
   function load(){
     const key=`${KEY}:${year}-${String(month+1).padStart(2,'0')}`;
@@ -297,7 +279,7 @@
     }catch(e){ return false; }
   }
 
-  /* ===== 進捗テーブル ===== */
+  /* ========== 進捗レンダリング ========== */
   function renderProgress(){
     ensureScaffold();
     $('#label').textContent=`${year}年${month+1}月（${monthDates(year,month).length}日）`;
@@ -341,7 +323,7 @@
       inRev.value=r.review||''; inRev.addEventListener('input',e=>{ pushHistory(); r.review=e.target.value; persist(r); });
       tdRev.appendChild(inRev);
 
-      // 色（通常/完了）
+      // 色
       const tdClr=document.createElement('td'); tdClr.className='small padL';
       const selClr=document.createElement('select');
       [{v:'normal',t:'通常'}, {v:'gray',t:'完了'}].forEach(p=>{
@@ -368,13 +350,11 @@
     scroller.scrollTo({top:Math.max(0,rowTop-headerH-4)});
   }
 
-  /* ===== 取り込み：貼付 / CSV/TSV / OCR ===== */
+  /* ========== 取り込み：貼付 / CSV/TSV / OCR ========== */
   function normalizeDateToken(raw){
     if(!raw) return null;
     raw = String(raw).trim();
-    // 括弧内の曜日を除去（例: 8/10(日) → 8/10）
-    raw = raw.replace(/（.*?）|\(.*?\)/g,'').trim();
-    // 受け入れ：YYYY-MM-DD / M/D / M月D日
+    raw = raw.replace(/（.*?）|\(.*?\)/g,'').trim(); // 曜日カッコ除去
     let y, mo, d;
     let m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if(m){ y=+m[1]; mo=+m[2]-1; d=+m[3]; }
@@ -386,11 +366,18 @@
     return {y,mo,d};
   }
 
+  // 空欄/NaN/null/undefined を空文字に正規化
+  function clean(v){
+    const s = String(v ?? '').trim();
+    if(!s) return '';
+    if(/^(nan|null|undefined)$/i.test(s)) return '';
+    return s;
+  }
+
   function parseTypeImport(text){
     const lines = (text||'').replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
     let applied=0;
     for(const ln of lines){
-      // 例: 8/13 休日 / 8月13日 学習 / 8/13(日) 復習
       const parts = ln.split(/[\s,　\t]+/).filter(Boolean);
       if(parts.length<2) continue;
       const dtk = normalizeDateToken(parts[0]); if(!dtk) continue;
@@ -418,6 +405,7 @@
     });
     return {header, rows};
   }
+
   function importCsvText(text){
     const {header, rows:objs} = parseDelimited(text);
     const col = {};
@@ -436,12 +424,17 @@
       const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
       const rec = rows.find(x=>x.date===ds);
       if(!rec) continue;
-      let t = String(o[col.type]||'').trim();
+
+      // 種別
+      let t = clean(o[col.type]);
       if(t==='休み') t='休日';
       if(/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; }
-      if(col.goal)   rec.goal   = String(o[col.goal]  ?? rec.goal   ?? '');
-      if(col.result) rec.result = String(o[col.result]?? rec.result ?? '');
-      if(col.review) rec.review = String(o[col.review]?? rec.review ?? '');
+
+      // 「列が存在するなら空でも上書き」←重要
+      if(col.goal   !== undefined) rec.goal   = clean(o[col.goal]);
+      if(col.result !== undefined) rec.result = clean(o[col.result]);
+      if(col.review !== undefined) rec.review = clean(o[col.review]);
+
       persist(rec); applied++;
     }
     return applied;
@@ -465,7 +458,7 @@
     }
   }
 
-  /* ===== ランキング ===== */
+  /* ========== ランキング ========== */
   function myMonthlyPoints(){
     let total=0;
     monthDates(year,month).forEach(date=>{
@@ -483,8 +476,8 @@
     const rnd=seedRand(seed); const dates=monthDates(year,month);
     return CLASSMATES.filter(n=>n!=='橋本淑雅').map(name=>{
       let sum=0; dates.forEach(()=>{const r=rnd(); if(r>0.65) sum+=10; else if(r>0.50) sum+=6;});
-      // 望月亜希子はTop5に入るよう少し加点
-      if(name==='望月亜希子') sum += 20 + Math.floor(rnd()*10); // +20〜29
+      // 望月はTop5寄せ
+      if(name==='望月亜希子') sum += 20 + Math.floor(rnd()*10);
       return {name, pts:sum};
     });
   }
@@ -492,7 +485,7 @@
     const meName=(($('#displayName').value)||'橋本淑雅').trim();
     const mePts=myMonthlyPoints();
     let rivals=classmatesMonthlyPoints();
-    // 最終保証：望月亜希子が5位以内に入るよう微調整
+    // 5位保証
     const fifth = [...rivals].sort((a,b)=>b.pts-a.pts)[4]?.pts ?? 0;
     rivals = rivals.map(p=> p.name==='望月亜希子' && p.pts<=fifth ? {...p, pts:fifth+1} : p);
     const list=[...rivals,{name:meName,pts:mePts,me:true}].sort((a,b)=>b.pts-a.pts);
@@ -511,78 +504,80 @@
     }
   }
 
-  /* ===== クラスメート ===== */
+  /* ========== クラスメート ========== */
   const CLASSMATES = [
-    '橋本淑雅',  // 主人公
-    '望月亜希子', // 追加＆Top5バイアス
-    '永田秀仁','高橋','嶋康','田中','池之内英明','加藤','唐杉先生','成木洋平','佐々木','富田雄二','富島雅人',
+    '橋本淑雅',  // あなた
+    '望月亜希子',
+
+    '永田秀仁','高橋','嶋康','田中','池之内英明','加藤','佐々木','富田雄二','富島雅人','成木洋平','唐杉先生',
+
+    // 男性（芸能・論客）
     'ぷろたん','大森元木','橋本範之','米山隆一','ひろゆき',
-    '綾瀬はるか','永野芽郁','石原さとみ','北川景色','有村架純','長澤まさみ','広瀬すず','深田恭子',
+
+    // 女優（女性）
+    '綾瀬はるか','永野芽郁','石原さとみ','北川景子','有村架純','長澤まさみ','広瀬すず','深田恭子',
     '本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀',
     '多部未華子','戸田恵梨香','広瀬アリス','吉高由里子'
   ];
+
+  // 性別マップ（色分け：男=青 / 女=オレンジ）
+  const FEMALES = new Set(['望月亜希子','綾瀬はるか','永野芽郁','石原さとみ','北川景子','有村架純','長澤まさみ','広瀬すず','深田恭子','本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀','多部未華子','戸田恵梨香','広瀬アリス','吉高由里子']);
   const FAMOUS_SET = new Set([
     'ぷろたん','大森元木','米山隆一','ひろゆき',
-    '綾瀬はるか','永野芽郁','石原さとみ','北川景色','有村架純','長澤まさみ','広瀬すず','深田恭子',
+    '綾瀬はるか','永野芽郁','石原さとみ','北川景子','有村架純','長澤まさみ','広瀬すず','深田恭子',
     '本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀','多部未華子','戸田恵梨香','広瀬アリス','吉高由里子',
     '望月亜希子'
   ]);
-  const ACTRESS_SET = new Set([
-    '綾瀬はるか','永野芽郁','石原さとみ','北川景色','有村架純','長澤まさみ','広瀬すず','深田恭子',
-    '本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀','多部未華子','戸田恵梨香','広瀬アリス','吉高由里子'
-  ]);
+  const ACTRESS_SET = new Set(FEMALES); // 女優は女性集合と同一で扱う
 
-  // 吹き出し時間レンジ（ms）: 最短5秒、マイペースは長め
+  // 吹き出し表示時間（ms）：最短5秒、人により～10秒
   const SPEAK_MS = new Map([
-    // 代表例：女優は落ち着き長め
     ['綾瀬はるか',[7000,11000]], ['有村架純',[7000,11000]], ['長澤まさみ',[7000,11000]],
-    // 望月は標準長め
     ['望月亜希子',[6500,10000]],
-    // 大森＝テンポ良い系
     ['大森元木',[5000,8000]],
   ]);
   function speakDur(name){
-    const [min,max] = SPEAK_MS.get(name) || [5000,10000];
+    const p = SPEAK_MS.get(name);
+    const min = p? p[0]:5000, max=p? p[1]:10000;
     return Math.floor(min + Math.random()*(max-min));
   }
 
-  // 大森元木（ミセス“風”パラフレーズ）
+  // 大森：Mrs. GREEN APPLE「風」（固有歌詞の引用は避け、励ましに再構成）
   function lineForOmori(){
     const pool = [
-      '胸の色が晴れるまで、一歩ずつ重ねよう',
-      '迷いがほどける瞬間は、手を動かした後に来る',
-      '君の速さでいい、でも止まらないで',
+      '胸の空が晴れるまで、少しずつ重ねよう',
+      '迷いは手を動かした先でほどけるよ',
+      '君のテンポでいい、でも止まらずにいこう',
       '小さな光でも、続ければ景色になる',
-      '鼓動が合図だよ、ページを開こう'
+      '鼓動を合図に、ページを開こう'
     ];
     return pool[Math.floor(Math.random()*pool.length)];
   }
-  // 女優：主演作の雰囲気に寄せた台詞風（新規文）
-  function lineForActress(name){
+  // 女優：主演作の雰囲気に寄せた台詞“風”（新規文）
+  function lineForActress(){
     const calm = [
       '背筋を伸ばして、最初の一行からいこう',
       '丁寧でいい。確かめながら進めば大丈夫',
-      '悩んだ分だけ深くなるよ。今は目の前だけ見て',
+      '悩んだ分だけ深くなるよ。いまは目の前だけ見て',
       '凛として、手をつけよう。流れはあとから来る'
     ];
     const bright = [
       'よし、まず5分！その5分が思ったより効くから',
-      '小さな達成を積もう。笑顔はあとから付いてくる',
+      '小さな達成を積もう。笑顔はあとからついてくる',
       '最初のページ、開いちゃおう！そこから始まるよ'
     ];
     const pick = Math.random()<0.55 ? calm : bright;
     return pick[Math.floor(Math.random()*pick.length)];
   }
-  // 一般メンバー
   const GENERAL = [
-    '千里の道も一歩から、今日は一歩だけでも',
-    '手を動かせば集中は育つ、まず1問',
-    '完璧より継続、今日は“完了”まで持っていこう',
-    'できることから一つずつ、積み上げは裏切らない',
-    '迷ったら開く、開けばエンジンがかかる'
+    '千里の道も一歩から。今日は一歩だけでも',
+    '手を動かせば集中は育つ。まず1問',
+    '完璧より継続。今日は“完了”まで持っていこう',
+    'できることから一つずつ。積み上げは裏切らない',
+    '迷ったら開く。開けばエンジンがかかる'
   ];
 
-  const recentLines = []; // 直近5件
+  const recentLines = []; // 直近5件で重複防止
   const lastSpeaker = { name: null };
   const INTRO = ['よし、','さて、','静かに深呼吸。','焦らずいこう。','ここからだよ。','今が合図。','まずは1分だけ。'];
   const ENDINGS = ['。','！','。','！','。'];
@@ -590,7 +585,7 @@
   function makeLine(name){
     let base;
     if(name==='大森元木') base = lineForOmori();
-    else if(ACTRESS_SET.has(name)) base = lineForActress(name);
+    else if(ACTRESS_SET.has(name)) base = lineForActress();
     else base = GENERAL[Math.floor(Math.random()*GENERAL.length)];
     if(Math.random()<0.6) base = INTRO[Math.floor(Math.random()*INTRO.length)] + base;
     if(Math.random()<0.4) base = base.replace(/[。!]?$/, ENDINGS[Math.floor(Math.random()*ENDINGS.length)]);
@@ -599,7 +594,7 @@
     let tries=0;
     while((recentLines.includes(base) || lastSpeaker.name===name) && tries<5){
       if(name==='大森元木') base = lineForOmori();
-      else if(ACTRESS_SET.has(name)) base = lineForActress(name);
+      else if(ACTRESS_SET.has(name)) base = lineForActress();
       else base = GENERAL[Math.floor(Math.random()*GENERAL.length)];
       if(Math.random()<0.6) base = INTRO[Math.floor(Math.random()*INTRO.length)] + base;
       if(Math.random()<0.4) base = base.replace(/[。!]?$/, ENDINGS[Math.floor(Math.random()*ENDINGS.length)]);
@@ -612,15 +607,14 @@
   }
 
   let speechTimers=[];
-  function clearSpeechTimers(){
-    speechTimers.forEach(id=>clearTimeout(id));
-    speechTimers=[];
-  }
+  function clearSpeechTimers(){ speechTimers.forEach(id=>clearTimeout(id)); speechTimers=[]; }
+
   function buildClassroom(){
     clearSpeechTimers();
     const desks=$('#desks'); desks.innerHTML='';
     CLASSMATES.forEach((name, idx)=>{
       const d=document.createElement('div'); d.className='desk';
+      d.classList.add(FEMALES.has(name)?'female':'male');
       const bubbleId=`bubble-${idx}`;
       const isYou = (name==='橋本淑雅');
       d.innerHTML = `
@@ -639,7 +633,7 @@
       b.textContent = makeLine(who);
       b.classList.add('show');
 
-      const visibleMs = speakDur(who); // 5〜10秒（人により長め設定）
+      const visibleMs = speakDur(who);           // 5〜10秒（人により長め）
       const hideId = setTimeout(()=>b.classList.remove('show'), visibleMs);
       speechTimers.push(hideId);
 
@@ -653,7 +647,7 @@
     });
   }
 
-  /* ===== タブ切替 ===== */
+  /* ========== タブ＆ページ ========== */
   function showPage(which){
     const p1=$('#pageProgress'), p2=$('#pageClass'), p3=$('#pageRank');
     const t1=$('#tabProgress'), t2=$('#tabClass'), t3=$('#tabRank');
@@ -661,6 +655,12 @@
     if(which==='progress'){ show(p1,[p2,p3]); t1.classList.add('active'); t2.classList.remove('active'); t3.classList.remove('active'); renderProgress(); }
     if(which==='class'){    show(p2,[p1,p3]); t2.classList.add('active'); t1.classList.remove('active'); t3.classList.remove('active'); buildClassroom(); }
     if(which==='rank'){     show(p3,[p1,p2]); t3.classList.add('active'); t1.classList.remove('active'); t2.classList.remove('active'); renderRank(); }
+  }
+  const PAGES = ['progress','class','rank'];
+  function pageIndexNow(){
+    if($('#pageProgress').style.display!=='none') return 0;
+    if($('#pageClass').style.display!=='none') return 1;
+    return 2;
   }
 
   function renderAll(){
@@ -672,7 +672,7 @@
     if(p3) renderRank();
   }
 
-  /* ===== イベント ===== */
+  /* ========== イベント ========== */
   // 名前
   (function initName(){
     const saved=localStorage.getItem(NAME_KEY);
@@ -684,6 +684,18 @@
   $('#tabProgress').addEventListener('click',()=>showPage('progress'));
   $('#tabClass').addEventListener('click',()=>showPage('class'));
   $('#tabRank').addEventListener('click',()=>showPage('rank'));
+
+  // ページ戻る/進む
+  $('#pagePrev').addEventListener('click',()=>{
+    const i = pageIndexNow();
+    const ni = (i+3-1)%3;
+    showPage(PAGES[ni]);
+  });
+  $('#pageNext').addEventListener('click',()=>{
+    const i = pageIndexNow();
+    const ni = (i+1)%3;
+    showPage(PAGES[ni]);
+  });
 
   // 進捗ナビ
   $('#prev').addEventListener('click',()=>{ pushHistory(); month-=1; if(month<0){month=11;year-=1;} load(); renderProgress(); renderRank(); });
@@ -741,8 +753,8 @@
 
   // 初期表示
   (function init(){
-    // v13互換ロード（あればマージ）
-    const keyOld=`studyplanner.v13.ocr:${year}-${String(month+1).padStart(2,'0')}`;
+    // v13/14のキーがあれば当月分を移行
+    const keyOld=`studyplanner.v14.ocr:${year}-${String(month+1).padStart(2,'0')}`;
     const rawOld=localStorage.getItem(keyOld);
     if(rawOld && !localStorage.getItem(`${KEY}:${year}-${String(month+1).padStart(2,'0')}`)){
       try{ localStorage.setItem(`${KEY}:${year}-${String(month+1).padStart(2,'0')}`, rawOld); }catch{}
