@@ -89,7 +89,7 @@
   .fab span{font-size:22px;line-height:1}
 
   /* C：教室ページ */
-  .blackboard{border-radius:10px;border:2px solid var(--board-frame);background:var(--board);color:#e0f2f1;padding:10px 12px;font-weight:600;margin-bottom:10px}
+  .blackboard{border-radius:10px;border:2px solid var(--board-frame);background:#0f3b3f;color:#e0f2f1;padding:10px 12px;font-weight:600;margin-bottom:10px}
   .room{border:1px solid var(--line);border-radius:12px;padding:14px;background:#f7fafc;max-height:80vh;overflow:auto}
   .desks{display:grid;gap:12px;grid-template-columns:repeat(3, minmax(0,1fr))}
   .desk{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;min-height:110px;display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden}
@@ -293,10 +293,8 @@
       if(r.color==='gray') tr.classList.add('manual-gray');
       else if(date===todayStr) tr.classList.add('today');
 
-      // 日付
       const tdDate=document.createElement('td'); tdDate.className='medium'; tdDate.textContent=jpDateLabel(date);
 
-      // 種別（表示＋小トグル）
       const tdType=document.createElement('td'); tdType.className='small padL';
       const wrap=document.createElement('div'); wrap.className='type-wrap';
       const badge=document.createElement('span'); badge.className='type-badge'; badge.textContent=(r.type==='休日')?'休日':(r.type==='復習'?'復習':'学習');
@@ -305,25 +303,21 @@
       btn.addEventListener('click',()=>{ pushHistory(); r.type=(r.type==='休日')?'学習':'休日'; persist(r); renderProgress(); renderRank(); });
       wrap.appendChild(badge); wrap.appendChild(btn); tdType.appendChild(wrap);
 
-      // 目標
       const tdGoal=document.createElement('td'); tdGoal.className='medium padL';
       const inGoal=document.createElement('input'); inGoal.type='text'; inGoal.placeholder='例：世界史 23〜24';
       inGoal.value=r.goal||''; inGoal.addEventListener('input',e=>{ pushHistory(); r.goal=e.target.value; persist(r); });
       tdGoal.appendChild(inGoal);
 
-      // 結果
       const tdRes=document.createElement('td'); tdRes.className='medium padL';
       const inRes=document.createElement('input'); inRes.type='text'; inRes.placeholder='実績';
       inRes.value=r.result||''; inRes.addEventListener('input',e=>{ pushHistory(); r.result=e.target.value; persist(r); });
       tdRes.appendChild(inRes);
 
-      // 復習
       const tdRev=document.createElement('td'); tdRev.className='medium padL';
       const inRev=document.createElement('input'); inRev.type='text'; inRev.placeholder='復習範囲';
       inRev.value=r.review||''; inRev.addEventListener('input',e=>{ pushHistory(); r.review=e.target.value; persist(r); });
       tdRev.appendChild(inRev);
 
-      // 色
       const tdClr=document.createElement('td'); tdClr.className='small padL';
       const selClr=document.createElement('select');
       [{v:'normal',t:'通常'}, {v:'gray',t:'完了'}].forEach(p=>{
@@ -366,7 +360,6 @@
     return {y,mo,d};
   }
 
-  // 空欄/NaN/null/undefined を空文字に正規化
   function clean(v){
     const s = String(v ?? '').trim();
     if(!s) return '';
@@ -425,7 +418,6 @@
       const rec = rows.find(x=>x.date===ds);
       if(!rec) continue;
 
-      // 種別
       let t = clean(o[col.type]);
       if(t==='休み') t='休日';
       if(/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; }
@@ -438,6 +430,72 @@
       persist(rec); applied++;
     }
     return applied;
+  }
+
+  /* ====== 縦一列フォーマット対応（追加） ====== */
+  function looksLikeColumnBlocks(text){
+    const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
+    if (L.length < 12) return false;
+    const i = L.findIndex(s => s.includes('日付'));
+    if (i < 0 || i + 4 >= L.length) return false;
+    const head = L.slice(i, i+5);
+    const need = ['日付','種別','目標','結果','復習'];
+    if (!need.every((w,idx)=> (head[idx]||'').includes(w))) return false;
+    return L.slice(i+5).some(s => /^\d{1,2}[\/\-月]\d{1,2}/.test(s) || /^\d{4}-\d{2}-\d{2}$/.test(s));
+  }
+  function parseColumnBlocks(text){
+    const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
+    const i = L.findIndex(s => s.includes('日付'));
+    const header = L.slice(i, i+5).map(s=>s.replace(/\s/g,''));
+    const data = L.slice(i+5);
+
+    const rows = [];
+    let block = {};
+    let ptr = 0; // 0日付 1種別 2目標 3結果 4復習
+    for (const line of data){
+      if (['日付','種別','目標','結果','復習'].includes(line)) continue;
+      if (ptr === 0){ block={}; block['日付']=line; ptr=1; continue; }
+      if (ptr === 1){ block['種別']=line; ptr=2; continue; }
+      if (ptr === 2){ block['目標']=line; ptr=3; continue; }
+      if (ptr === 3){ block['結果']=line; ptr=4; continue; }
+      if (ptr === 4){ block['復習']=line; rows.push(block); ptr=0; continue; }
+    }
+    if (ptr !== 0){
+      block['目標'] = block['目標'] ?? '';
+      block['結果'] = block['結果'] ?? '';
+      block['復習'] = block['復習'] ?? '';
+      rows.push(block);
+    }
+    return { header:['日付','種別','目標','結果','復習'], rows };
+  }
+  function importAnyText(text){
+    try{
+      const n = importCsvText(text);
+      if (n>0) return n;
+    }catch(_){}
+    if (looksLikeColumnBlocks(text)){
+      const parsed = parseColumnBlocks(text);
+      let applied=0;
+      const col = {date:'日付', type:'種別', goal:'目標', result:'結果', review:'復習'};
+      for (const o of parsed.rows){
+        const dtk = normalizeDateToken(o[col.date]); if(!dtk) continue;
+        if (dtk.y !== year || dtk.mo !== month) continue;
+        const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
+        const rec = rows.find(x=>x.date===ds); if(!rec) continue;
+
+        let t = clean(o[col.type]);
+        if (t==='休み') t='休日';
+        if (/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; }
+
+        rec.goal   = clean(o[col.goal]);
+        rec.result = clean(o[col.result]);
+        rec.review = clean(o[col.review]);
+
+        persist(rec); applied++;
+      }
+      return applied;
+    }
+    return 0;
   }
 
   async function ocrImage(file){
@@ -476,8 +534,7 @@
     const rnd=seedRand(seed); const dates=monthDates(year,month);
     return CLASSMATES.filter(n=>n!=='橋本淑雅').map(name=>{
       let sum=0; dates.forEach(()=>{const r=rnd(); if(r>0.65) sum+=10; else if(r>0.50) sum+=6;});
-      // 望月はTop5寄せ
-      if(name==='望月亜希子') sum += 20 + Math.floor(rnd()*10);
+      if(name==='望月亜希子') sum += 20 + Math.floor(rnd()*10); // Top5寄せ
       return {name, pts:sum};
     });
   }
@@ -485,7 +542,6 @@
     const meName=(($('#displayName').value)||'橋本淑雅').trim();
     const mePts=myMonthlyPoints();
     let rivals=classmatesMonthlyPoints();
-    // 5位保証
     const fifth = [...rivals].sort((a,b)=>b.pts-a.pts)[4]?.pts ?? 0;
     rivals = rivals.map(p=> p.name==='望月亜希子' && p.pts<=fifth ? {...p, pts:fifth+1} : p);
     const list=[...rivals,{name:meName,pts:mePts,me:true}].sort((a,b)=>b.pts-a.pts);
@@ -506,21 +562,13 @@
 
   /* ========== クラスメート ========== */
   const CLASSMATES = [
-    '橋本淑雅',  // あなた
-    '望月亜希子',
-
+    '橋本淑雅','望月亜希子',
     '永田秀仁','高橋','嶋康','田中','池之内英明','加藤','佐々木','富田雄二','富島雅人','成木洋平','唐杉先生',
-
-    // 男性（芸能・論客）
     'ぷろたん','大森元木','橋本範之','米山隆一','ひろゆき',
-
-    // 女優（女性）
     '綾瀬はるか','永野芽郁','石原さとみ','北川景子','有村架純','長澤まさみ','広瀬すず','深田恭子',
     '本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀',
     '多部未華子','戸田恵梨香','広瀬アリス','吉高由里子'
   ];
-
-  // 性別マップ（色分け：男=青 / 女=オレンジ）
   const FEMALES = new Set(['望月亜希子','綾瀬はるか','永野芽郁','石原さとみ','北川景子','有村架純','長澤まさみ','広瀬すず','深田恭子','本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀','多部未華子','戸田恵梨香','広瀬アリス','吉高由里子']);
   const FAMOUS_SET = new Set([
     'ぷろたん','大森元木','米山隆一','ひろゆき',
@@ -528,13 +576,11 @@
     '本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀','多部未華子','戸田恵梨香','広瀬アリス','吉高由里子',
     '望月亜希子'
   ]);
-  const ACTRESS_SET = new Set(FEMALES); // 女優は女性集合と同一で扱う
+  const ACTRESS_SET = new Set(FEMALES);
 
-  // 吹き出し表示時間（ms）：最短5秒、人により～10秒
   const SPEAK_MS = new Map([
     ['綾瀬はるか',[7000,11000]], ['有村架純',[7000,11000]], ['長澤まさみ',[7000,11000]],
-    ['望月亜希子',[6500,10000]],
-    ['大森元木',[5000,8000]],
+    ['望月亜希子',[6500,10000]], ['大森元木',[5000,8000]],
   ]);
   function speakDur(name){
     const p = SPEAK_MS.get(name);
@@ -542,7 +588,6 @@
     return Math.floor(min + Math.random()*(max-min));
   }
 
-  // 大森：Mrs. GREEN APPLE「風」（固有歌詞の引用は避け、励ましに再構成）
   function lineForOmori(){
     const pool = [
       '胸の空が晴れるまで、少しずつ重ねよう',
@@ -553,7 +598,6 @@
     ];
     return pool[Math.floor(Math.random()*pool.length)];
   }
-  // 女優：主演作の雰囲気に寄せた台詞“風”（新規文）
   function lineForActress(){
     const calm = [
       '背筋を伸ばして、最初の一行からいこう',
@@ -662,7 +706,6 @@
     if($('#pageClass').style.display!=='none') return 1;
     return 2;
   }
-
   function renderAll(){
     const p1 = $('#pageProgress').style.display!=='none';
     const p2 = $('#pageClass').style.display!=='none';
@@ -673,19 +716,16 @@
   }
 
   /* ========== イベント ========== */
-  // 名前
   (function initName(){
     const saved=localStorage.getItem(NAME_KEY);
     $('#displayName').value = saved || '橋本淑雅';
   })();
   $('#saveName').addEventListener('click',()=>{ localStorage.setItem(NAME_KEY, ($('#displayName').value||'橋本淑雅').trim()); renderRank(); });
 
-  // タブ
   $('#tabProgress').addEventListener('click',()=>showPage('progress'));
   $('#tabClass').addEventListener('click',()=>showPage('class'));
   $('#tabRank').addEventListener('click',()=>showPage('rank'));
 
-  // ページ戻る/進む
   $('#pagePrev').addEventListener('click',()=>{
     const i = pageIndexNow();
     const ni = (i+3-1)%3;
@@ -697,41 +737,40 @@
     showPage(PAGES[ni]);
   });
 
-  // 進捗ナビ
   $('#prev').addEventListener('click',()=>{ pushHistory(); month-=1; if(month<0){month=11;year-=1;} load(); renderProgress(); renderRank(); });
   $('#next').addEventListener('click',()=>{ pushHistory(); month+=1; if(month>11){month=0;year+=1;} load(); renderProgress(); renderRank(); });
   $('#save').addEventListener('click',save);
   $('#load').addEventListener('click',()=>{ const ok=load(); renderProgress(); renderRank(); alert(ok?'読み込みました':'保存データが見つかりません'); });
   $('#toggleCompact').addEventListener('click',()=>{ document.body.classList.toggle('compact'); });
 
-  // 取り込み：貼付
+  // 貼り付け取込：タイプ行（8/13 休日 等）＋縦一列CSVの両対応
   $('#importPaste').addEventListener('click',()=>{
-    const text = prompt('日付と種別の一覧を貼り付け（例: 8/13(日) 休日）');
+    const text = prompt('日付と種別の一覧や、縦一列の表を貼り付け（例: 8/13(日) 休日 など）');
     if(!text) return;
     pushHistory();
-    const n = parseTypeImport(text);
+    const n = parseTypeImport(text) || importAnyText(text);
     renderProgress(); renderRank();
     alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした');
   });
 
-  // 取り込み：CSV/TSV/TXT
+  // CSV/TSV/TXT取込：通常CSV→縦一列の順に自動判別
   $('#importFile').addEventListener('change',async (e)=>{
     const f=e.target.files?.[0]; if(!f) return;
     const txt=await f.text();
     pushHistory();
-    const n=importCsvText(txt);
+    const n= importAnyText(txt);
     renderProgress(); renderRank();
     alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした（見出し・当月か要確認）');
     e.target.value='';
   });
 
-  // 取り込み：OCR
+  // OCR取込：テキスト化→通常CSV or 縦一列 or タイプリストの順に試行
   $('#importImg').addEventListener('change',async (e)=>{
     const f=e.target.files?.[0]; if(!f) return;
     try{
       const text = await ocrImage(f);
       pushHistory();
-      const n = importCsvText(text) || parseTypeImport(text||'');
+      const n = importAnyText(text) || parseTypeImport(text||'');
       renderProgress(); renderRank();
       alert(n?`OCR取込で当月に ${n} 件反映しました`:'文字が認識できないか、当月データが見つかりませんでした');
     }catch(err){
@@ -741,19 +780,16 @@
     }
   });
 
-  // ページ別：Undo/Redo/全削除（実体は共通）
   $('#undoP').onclick = $('#undoC').onclick = $('#undoT').onclick = ()=>undo();
   $('#redoP').onclick = $('#redoC').onclick = $('#redoT').onclick = ()=>redo();
   $('#wipeP').onclick = ()=>{ if(confirm('当月の進捗を初期化します。よろしいですか？')){ pushHistory(); monthDates(year,month).forEach(ds=>{ const r=rows.find(x=>x.date===ds); if(r){ r.type='学習'; r.goal=''; r.result=''; r.review=''; r.color='normal'; persist(r);} }); renderProgress(); renderRank(); } };
   $('#wipeC').onclick = ()=>{ if(confirm('Cページの発話状態をリセットしますか？')){ recentLines.length=0; lastSpeaker.name=null; clearSpeechTimers(); buildClassroom(); } };
   $('#wipeT').onclick = ()=>{ if(confirm('ランキング表示を再計算しますか？')){ renderRank(); } };
 
-  // 右下：🐹＝ホーム(進捗)へ
   $('#fabHome').addEventListener('click',()=> showPage('progress'));
 
-  // 初期表示
   (function init(){
-    // v13/14のキーがあれば当月分を移行
+    // 旧キー移行
     const keyOld=`studyplanner.v14.ocr:${year}-${String(month+1).padStart(2,'0')}`;
     const rawOld=localStorage.getItem(keyOld);
     if(rawOld && !localStorage.getItem(`${KEY}:${year}-${String(month+1).padStart(2,'0')}`)){
