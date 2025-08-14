@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Study Planner – 月間進捗＋C(🏫)＋T(🏆)＋S(🗨️)</title>
+<title>Study Planner – 月間進捗＋C(🏫)＋T(🏆)</title>
 
+<!-- 画像OCR（iPad完結） -->
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 
 <style>
@@ -29,17 +30,17 @@
   h1{margin:0 0 calc(12px*var(--scale));font-size:calc(18px*var(--scale));display:flex;gap:8px;align-items:center}
   .topbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:calc(8px*var(--scale))}
   .muted{color:var(--muted);font-size:calc(12px*var(--scale))}
-  button,input[type="text"],input[type="number"],input[type="file"],textarea,select{
+  button,input[type="text"],input[type="file"],input[type="number"],textarea,select{
     padding:calc(10px*var(--scale)) calc(12px*var(--scale));
     border:1px solid var(--line);border-radius:12px;background:#fff;
-    font-size:calc(16px*var(--scale));
+    font-size:calc(16px*var(--scale));cursor:pointer
   }
-  textarea{width:100%;min-height:110px;resize:vertical;cursor:text}
-  button{cursor:pointer}
+  textarea{width:100%;min-height:120px;resize:vertical;cursor:text}
+  input[type="number"]{width:7em}
   button.primary{background:var(--accent);border-color:#2563eb;color:#fff}
   .pill{border-radius:999px;padding:6px 10px;font-size:14px}
 
-  .tabs{display:flex;gap:8px;margin:6px 0 10px;flex-wrap:wrap}
+  .tabs{display:flex;gap:8px;margin:6px 0 10px}
   .tab{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:#fff;cursor:pointer}
   .tab.active{background:#eef2ff;border-color:#c7d2fe}
 
@@ -50,7 +51,10 @@
     border-radius:10px;background:#f8fafc;font-size:calc(14px*var(--scale))
   }
 
-  .tbl{width:100%;border:1px solid var(--line);border-radius:12px;overflow:auto;max-height:calc(84vh*var(--scale))}
+  .tbl{
+    width:100%;border:1px solid var(--line);border-radius:12px;overflow:auto;
+    max-height:calc(84vh*var(--scale));
+  }
   table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
   th,td{padding:calc(8px*var(--scale));border-bottom:1px solid var(--line);vertical-align:top;background:#fff}
   th{
@@ -69,7 +73,7 @@
   .type-toggle{
     padding:calc(4px*var(--scale)) calc(8px*var(--scale));
     border:1px solid var(--line);border-radius:10px;background:#fff;
-    font-size:calc(12px*var(--scale))
+    font-size:calc(12px*var(--scale));cursor:pointer
   }
 
   .fab{
@@ -82,19 +86,8 @@
   .fab span{font-size:22px;line-height:1}
 
   .blackboard{border-radius:10px;border:2px solid #2f4f4f;background:#0f3b3f;color:#e0f2f1;padding:10px 12px;font-weight:600;margin-bottom:10px}
-
-  /* 教室：男女の列を交互に並べる */
   .room{border:1px solid var(--line);border-radius:12px;padding:14px;background:#f7fafc;max-height:80vh;overflow:auto}
-  .columns{display:grid;gap:12px}
-  .col{display:flex;flex-direction:column;gap:12px}
-  .col.male .col-title{color:var(--male)} .col.female .col-title{color:var(--female)}
-  .col-title{font-weight:800;font-size:14px}
-
-  /* 列数は画面幅で変える（JS側で列数に合わせて交互に配置） */
-  @media (min-width:1100px){ .columns{grid-template-columns:repeat(5, minmax(180px,1fr));} }
-  @media (min-width:760px) and (max-width:1099px){ .columns{grid-template-columns:repeat(3, minmax(180px,1fr));} }
-  @media (max-width:759px){ .columns{grid-template-columns:repeat(2, minmax(160px,1fr));} }
-
+  .desks{display:grid;gap:12px;grid-template-columns:repeat(3, minmax(0,1fr))}
   .desk{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;min-height:110px;display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden}
   .desk .name{font-weight:700}
   .desk .role{font-size:12px;color:#6b7280}
@@ -123,11 +116,11 @@
 
   .ops{display:flex;gap:8px;align-items:center;margin:6px 0 10px}
 
-  /* ④ページ：台詞編集 */
-  .lines-card{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;margin-bottom:12px}
-  .lines-head{display:flex;align-items:center;gap:8px;justify-content:space-between;flex-wrap:wrap}
-  .name-badge{font-weight:800}
-  .smallbtn{padding:6px 10px;border-radius:10px}
+  /* Page4 editor */
+  .grid-edit{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .card{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff}
+  .card h4{margin:0 0 6px}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -146,7 +139,7 @@
     <button id="tabProgress" class="tab active">進捗</button>
     <button id="tabClass" class="tab" title="学校">C 🏫</button>
     <button id="tabRank" class="tab" title="順位">T 🏆</button>
-    <button id="tabLines" class="tab" title="台詞編集">S 🗨️</button>
+    <button id="tabEdit" class="tab" title="セリフ編集">S 💬</button>
   </div>
 
   <div class="pager">
@@ -204,20 +197,20 @@
 
   <!-- ===== Page 2: クラスメート ===== -->
   <section id="pageClass" style="display:none">
-    <div class="ops" style="gap:12px;align-items:center">
+    <div class="ops">
       <button id="undoC">戻る</button>
       <button id="redoC">進む</button>
       <button id="wipeC">全削除</button>
-      <div style="display:flex;gap:8px;align-items:center">
-        <label class="muted">吹き出しスピード（％増）</label>
-        <input id="speedBoost" type="number" inputmode="numeric" min="-80" max="300" step="1" style="width:110px" placeholder="0">
-        <button id="applySpeed" class="smallbtn">反映</button>
-        <span id="speedInfo" class="muted"></span>
-      </div>
     </div>
-    <div class="blackboard">1年B組 – クラスメートが「橋本淑雅」を応援中！</div>
+    <div class="blackboard">
+      1年B組 – クラスメートが「<span id="meOnBoard">橋本淑雅</span>」を応援中！
+      <span style="margin-left:10px" class="muted">速さ%増し：</span>
+      <input id="boostInput" type="number" min="0" step="1" value="0" title="例: 13 → 13%速く">
+      <button id="applyBoost">適用</button>
+      <span id="boostHint" class="muted"></span>
+    </div>
     <div class="room">
-      <div class="columns" id="columns"></div>
+      <div class="desks" id="desks"></div>
     </div>
   </section>
 
@@ -237,14 +230,18 @@
     </div>
   </section>
 
-  <!-- ===== Page 4: 台詞編集 ===== -->
-  <section id="pageLines" style="display:none">
+  <!-- ===== Page 4: セリフ編集 ===== -->
+  <section id="pageEdit" style="display:none">
     <div class="ops">
-      <button id="saveAllLines" class="primary">💾 全保存</button>
-      <button id="resetAllLines">↩︎ すべて既定に戻す</button>
-      <span class="muted">※1行=1フレーズ。保存すると②ページに即反映（ローカル保存）。</span>
+      <span class="muted">各人：1行=1セリフ。空欄にするとミュート（発言しない）</span>
+      <span class="muted">自動保存：入力停止0.6秒で保存</span>
+      <button id="exportLines">💾 書き出し</button>
+      <label>
+        <input id="importLinesFile" type="file" accept=".json" style="display:none">
+        <button onclick="document.getElementById('importLinesFile').click()">📥 読込</button>
+      </label>
     </div>
-    <div id="linesWrap"></div>
+    <div class="grid-edit" id="editGrid"></div>
   </section>
 
   <button class="fab" id="fabHome" title="ホームへ"><span>🐹</span></button>
@@ -255,13 +252,13 @@
 
   const KEY='studyplanner.v15.ocr';
   const NAME_KEY='studyplanner.displayName';
-  const SPEED_KEY='studyplanner.speedBoost.v1';
-  const LINES_KEY='studyplanner.lines.v1';
+  const LINES_KEY='studyplanner.v15.lines';
+  const BOOST_KEY='studyplanner.v15.classBoost';
 
   let year=(new Date()).getFullYear(), month=(new Date()).getMonth();
   let rows=[]; // {date,type,goal,result,review,color}
 
-  /* ======= Auto Save for page 1 ======= */
+  // ======= Auto Save (Page1) =======
   const AUTOSAVE_MS = 800;
   let autoSaveTimer = null;
   const currentKey = ()=> `${KEY}:${year}-${String(month+1).padStart(2,'0')}`;
@@ -272,9 +269,7 @@
     });
     try{ localStorage.setItem(currentKey(), JSON.stringify(data)); }catch(_){}
   }
-  function touch(){ if(autoSaveTimer) clearTimeout(autoSaveTimer);
-    autoSaveTimer = setTimeout(()=>{ doSaveToLocal(); autoSaveTimer=null; }, AUTOSAVE_MS);
-  }
+  function touch(){ if(autoSaveTimer) clearTimeout(autoSaveTimer); autoSaveTimer=setTimeout(()=>{ doSaveToLocal(); autoSaveTimer=null; }, AUTOSAVE_MS); }
   function flushAutoSave(){ if(autoSaveTimer){ clearTimeout(autoSaveTimer); autoSaveTimer=null; } doSaveToLocal(); }
   window.addEventListener('beforeunload', flushAutoSave);
 
@@ -285,7 +280,7 @@
   function undo(){ if(!history.past.length) return; const cur=snapshot(); const prev=history.past.pop(); history.future.push(cur); ({year,month,rows}=prev); renderAll(); }
   function redo(){ if(!history.future.length) return; const cur=snapshot(); const nxt=history.future.pop(); history.past.push(cur); ({year,month,rows}=nxt); renderAll(); }
 
-  /* ========== utils ========== */
+  /* ========== 小ユーティリティ ========== */
   const $=sel=>document.querySelector(sel);
   const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   const fromYmd=s=>{const [y,m,d]=s.split('-').map(Number); return new Date(y, m-1, d);};
@@ -300,14 +295,8 @@
   }
   function persist(rec){const i=rows.findIndex(x=>x.date===rec.date); if(i>=0) rows[i]=rec; else rows.push(rec);}
 
-  /* ========== 保存/読込 ========== */
-  function save(){
-    pushHistory();
-    flushAutoSave();
-    alert('更新しました（この端末のブラウザ内）');
-    renderRank();
-    scrollTodayIntoView();
-  }
+  /* ========== Page1: 保存/読込 ========== */
+  function save(){ pushHistory(); flushAutoSave(); alert('更新しました（この端末のブラウザ内）'); renderRank(); scrollTodayIntoView(); }
   function load(){
     const raw=localStorage.getItem(currentKey());
     if(!raw) return false;
@@ -320,7 +309,7 @@
     }catch(e){ return false; }
   }
 
-  /* ========== 進捗レンダリング ========== */
+  /* ========== Page1: 進捗レンダリング ========== */
   function renderProgress(){
     ensureScaffold();
     $('#label').textContent=`${year}年${month+1}月（${monthDates(year,month).length}日）`;
@@ -389,7 +378,7 @@
     scroller.scrollTo({top:Math.max(0,rowTop-headerH-4), behavior:'instant'});
   }
 
-  /* ========== 取込：貼付/CSV/TSV/OCR ========== */
+  /* ========== 取り込み：貼付 / CSV/TSV / OCR ========== */
   function normalizeDateToken(raw){
     if(!raw) return null;
     let s = String(raw).trim();
@@ -401,19 +390,11 @@
     if(m){ const y = year; return {y, mo:+m[1]-1, d:+m[2]}; }
     return null;
   }
-  function clean(v){ const s = String(v ?? '').trim(); if(!s) return ''; if(/^(nan|null|undefined)$/i.test(s)) return ''; return s; }
-
-  function parseDelimited(text){
-    if(text.charCodeAt(0)===0xFEFF) text = text.slice(1);
-    const sep = (text.indexOf('\t')!==-1) ? '\t' : ',';
-    const lines = text.replace(/\r\n?/g,'\n').split('\n').filter(l=>l.trim()!=='');
-    const header = lines[0].split(sep).map(s=>s.trim());
-    const rows = lines.slice(1).map(line=>{
-      const cells = line.split(sep);
-      const obj = {}; header.forEach((h,i)=> obj[h] = (cells[i]??'').trim());
-      return obj;
-    });
-    return {header, rows};
+  function clean(v){
+    const s = String(v ?? '').trim();
+    if(!s) return '';
+    if(/^(nan|null|undefined)$/i.test(s)) return '';
+    return s;
   }
   function parseTypeImport(text){
     const lines = (text||'').replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
@@ -425,7 +406,6 @@
       let typ = parts[1].replace(/\s/g,'').trim();
       if(typ==='休み') typ='休日';
       if(!/^(学習|休日|復習)$/.test(typ)) continue;
-
       if(dtk.y!==year || dtk.mo!==month) continue;
       const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
       const rec = rows.find(x=>x.date===ds);
@@ -433,6 +413,18 @@
     }
     if(applied) touch();
     return applied;
+  }
+  function parseDelimited(text){
+    if(text.charCodeAt(0)===0xFEFF) text = text.slice(1);
+    const sep = (text.indexOf('\t')!==-1) ? '\t' : ',';
+    const lines = text.replace(/\r\n?/g,'\n').split('\n').filter(l=>l.trim()!=='');
+    const header = lines[0].split(sep).map(s=>s.trim());
+    const rows = lines.slice(1).map(line=>{
+      const cells = line.split(sep);
+      const obj = {}; header.forEach((h,i)=> obj[h] = (cells[i]??'').trim());
+      return obj;
+    });
+    return {header, rows};
   }
   function importCsvText(text){
     const {header, rows:objs} = parseDelimited(text);
@@ -480,7 +472,6 @@
     const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
     const i = L.findIndex(s => s.includes('日付'));
     const data = L.slice(i+5);
-
     const rows = [];
     let block = {};
     let ptr = 0;
@@ -518,11 +509,9 @@
         let t = clean(o[col.type]);
         if (t==='休み') t='休日';
         if (/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; }
-
         rec.goal   = clean(o[col.goal]);
         rec.result = clean(o[col.result]);
         rec.review = clean(o[col.review]);
-
         persist(rec); applied++;
       }
       if(applied) touch();
@@ -549,7 +538,7 @@
     }
   }
 
-  /* ========== ランキング ========== */
+  /* ========== Page3: ランキング ========== */
   function myMonthlyPoints(){
     let total=0;
     monthDates(year,month).forEach(date=>{
@@ -593,7 +582,7 @@
     }
   }
 
-  /* ========== クラスメート（名前/性別/有名人） ========== */
+  /* ========== Page2: クラスメート（吹き出し） ========== */
   const CLASSMATES = [
     '橋本淑雅','望月亜希子',
     '永田秀仁','高橋','嶋康','田中','池之内英明','加藤','佐々木','富田雄二','富島雅人','成木洋平','唐杉先生',
@@ -607,230 +596,279 @@
     'ぷろたん','大森元木','米山隆一','ひろゆき',
     '綾瀬はるか','永野芽郁','石原さとみ','北川景色','有村架純','長澤まさみ','広瀬すず','深田恭子',
     '本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀','多部未華子','戸田恵梨香','広瀬アリス','吉高由里子',
-    '望月亜希子','唐杉先生'
+    '望月亜希子'
   ]);
 
-  /* ========== セリフ（既定＋カスタム） ========== */
+  // ==== 既定セリフ（ベース） ====
   const BASE_GENERAL = [
     '今日も一歩ずつ！','その調子！','休憩も忘れずに','昨日の復習いこ！',
     '目標メモした？','終わったら＋10ptだ！','分からない所は付箋！',
-    'まずは5分だけやってみよ','手を動かせば集中スイッチ入るよ','できた所からでOK！'
+    '焦らず丁寧に！','5分だけでも手を動かそう','間違いは伸びしろだ！'
   ];
-  const BASE_FAMOUS = [
-    'ナイス！映えてる！','全集中だね！','今日のベスト更新いける！'
-  ];
-  const BASE_TOKUSUGI = [
-    '「鳴くまで待とう、ホトトギス」焦らず準備が勝ちだ。（家康）',
-    '「心に太陽を持て」毎日すこしずつ積み上げよう。',
-    '「百聞は一見に如かず」まず一問、解いて確かめよう。',
-    '「石の上にも三年」今の一歩が未来を変える。'
-  ];
-  // 既定：全38人が必ず何か持つように
+  // 名前別の既定（必要なら増やしてOK）
   const defaultLines = {};
-  CLASSMATES.forEach(n=>{
-    if(n==='唐杉先生') defaultLines[n] = BASE_TOKUSUGI;
-    else if(FAMOUS_SET.has(n)) defaultLines[n] = BASE_GENERAL.concat(BASE_FAMOUS);
-    else defaultLines[n] = BASE_GENERAL;
-  });
+  CLASSMATES.forEach(n=>{ defaultLines[n] = []; });
 
-  // カスタムの読み書き
-  function loadCustomLines(){
-    try{ return JSON.parse(localStorage.getItem(LINES_KEY)||'{}'); }catch(_){ return {}; }
-  }
-  function saveCustomLines(map){ try{ localStorage.setItem(LINES_KEY, JSON.stringify(map)); }catch(_){} }
+  // ==== カスタムセリフ保存/読込（Page4用） ====
   let customLines = loadCustomLines();
+  function loadCustomLines(){
+    try{
+      const raw = localStorage.getItem(LINES_KEY);
+      return raw ? JSON.parse(raw) : {};
+    }catch(_){ return {}; }
+  }
+  let lineAutosaveTimer=null;
+  function scheduleLinesSave(){
+    if(lineAutosaveTimer) clearTimeout(lineAutosaveTimer);
+    lineAutosaveTimer = setTimeout(()=>{ saveCustomLines(); }, 600);
+  }
+  function saveCustomLines(){
+    try{ localStorage.setItem(LINES_KEY, JSON.stringify(customLines)); }catch(_){}
+  }
 
   function getLinesFor(name){
-    const arr = customLines[name];
-    if(Array.isArray(arr) && arr.filter(s=>s && s.trim()).length>0) return arr.filter(s=>s.trim());
-    return defaultLines[name]||BASE_GENERAL;
+    if(Object.prototype.hasOwnProperty.call(customLines, name)){
+      // 空配列=ミュート（発言しない）
+      const arr = Array.isArray(customLines[name]) ? customLines[name] : [];
+      return arr;
+    }
+    // 未設定→既定があればそれ、なければ一般
+    const base = (defaultLines[name] && defaultLines[name].length ? defaultLines[name] : BASE_GENERAL);
+    return base.slice();
   }
 
-  /* ========== 吹き出し（スピード調整） ========== */
-  let classTicker = null;
   const recentLines = [];
-  let lastSpeaker = { name:null, ts:0 };
-  function getBoost(){ return parseInt(localStorage.getItem(SPEED_KEY)||'0',10) || 0; }
-  function setBoost(v){ try{ localStorage.setItem(SPEED_KEY, String(v)); }catch(_){} }
-  function factorFromBoost(boostPercent){
-    const f = 1 - (boostPercent/100); // 13%増し→ 0.87倍(速い)
-    return Math.min(3, Math.max(0.2, f));
-  }
   function lineFor(name){
     const pool = getLinesFor(name);
+    if(!pool.length) return null; // ミュート
     let msg = pool[Math.floor(Math.random()*pool.length)];
     let guard = 0;
     while(recentLines.includes(msg) && guard++<6){
       msg = pool[Math.floor(Math.random()*pool.length)];
     }
     recentLines.push(msg);
-    if(recentLines.length>10) recentLines.shift();
+    if(recentLines.length>12) recentLines.shift();
     return msg;
   }
+
+  function factorFromBoost(boostPct){
+    const k = Math.max(0, Number(boostPct)||0);
+    return 1 / (1 + k/100); // ％増し → 時間を短縮
+  }
+  function getBoost(){
+    const v = Number($('#boostInput').value)||0;
+    return Math.max(0, v);
+  }
+
+  // 複数人同時発言エンジン
+  let classTicker = null;
+  const lastSpokenAt = new Map(); // name -> timestamp
+  function visibleDurationMs(){
+    return Math.round(3000 * factorFromBoost(getBoost()));
+  }
+  function cooldownMs(){
+    // 見えている時間の0.9倍をクールダウン（かぶり防止）
+    return Math.max(800, Math.round(visibleDurationMs()*0.9));
+  }
+  function baseTickMs(){
+    // ベース間隔 1200ms をスピードで短縮
+    return Math.max(200, Math.round(1200 * factorFromBoost(getBoost())));
+  }
+  function randomEmissionCount(){
+    // 0,1,2,3 を重み付きで、たまに4
+    const r = Math.random();
+    if(r < 0.20) return 0;
+    if(r < 0.60) return 1;
+    if(r < 0.90) return 2;
+    if(r < 0.98) return 3;
+    return 4;
+  }
+
   function showBubble(deskEl, name){
     const bubble = deskEl.querySelector('.bubble');
     if(!bubble) return;
+    const msg = lineFor(name);
+    if(msg === null){ bubble.classList.remove('show'); return; } // ミュート
     const isFamous = FAMOUS_SET.has(name);
     bubble.className = 'bubble' + (isFamous ? ' famous' : '');
-    bubble.textContent = lineFor(name);
+    bubble.textContent = msg;
     bubble.classList.add('show');
+    const vms = visibleDurationMs();
+    setTimeout(()=> bubble.classList.remove('show'), vms);
+    lastSpokenAt.set(name, Date.now());
+  }
 
-    const factor = factorFromBoost(getBoost());
-    const visibleMs = Math.round(3000 * factor);
-    setTimeout(()=> bubble.classList.remove('show'), visibleMs);
-    lastSpeaker = {name, ts:Date.now()};
-  }
-  function startClassTicker(){
-    stopClassTicker();
-    classTicker = setInterval(()=>{
-      const desks = Array.from(document.querySelectorAll('#columns .desk'));
-      if(desks.length===0) return;
-      const idx = Math.floor(Math.random()*desks.length);
-      const el = desks[idx];
-      const name = el.querySelector('.name')?.textContent || '';
-      if(name){
-        const factor = factorFromBoost(getBoost());
-        if(name===lastSpeaker.name && Date.now()-lastSpeaker.ts < 2500*factor) return;
-        showBubble(el, name);
-      }
-    }, Math.round(3500 * factorFromBoost(getBoost())));
-  }
-  function stopClassTicker(){ if(classTicker){ clearInterval(classTicker); classTicker=null; } }
-
-  /* ========== 教室の並べ方：男列・女列を交互 ========== */
-  function currentColsCount(){
-    const w = window.innerWidth;
-    if(w>=1100) return 5;
-    if(w>=760) return 3;
-    return 2;
-  }
-  function buildClassroom(){
-    const wrap=$('#columns'); if(!wrap) return; wrap.innerHTML='';
+  function arrangeNamesMFM(){
+    // 男の列 / 女の列 / 男の列
     const males = CLASSMATES.filter(n=>!FEMALES.has(n));
     const females = CLASSMATES.filter(n=>FEMALES.has(n));
+    const half = Math.ceil(males.length/2);
+    const col1 = males.slice(0, half);
+    const col3 = males.slice(half);
+    const col2 = females;
+    const rows = Math.max(col1.length, col2.length, col3.length);
+    const arranged = [];
+    for(let i=0;i<rows;i++){
+      if(col1[i]) arranged.push(col1[i]);
+      if(col2[i]) arranged.push(col2[i]);
+      if(col3[i]) arranged.push(col3[i]);
+    }
+    return arranged;
+  }
 
-    const cols = currentColsCount();
-    const genders = Array.from({length:cols}, (_,i)=> i%2===0 ? 'male' : 'female');
-    // 列コンテナを作成
-    const colEls = genders.map((g,i)=>{
-      const c=document.createElement('div'); c.className='col '+g;
-      const title=document.createElement('div'); title.className='col-title'; title.textContent=(g==='male'?'男子':'女子')+` 列 ${i+1}`;
-      c.appendChild(title);
-      wrap.appendChild(c);
-      return c;
+  function buildClassroom(){
+    const desks=$('#desks'); if(!desks) return; desks.innerHTML='';
+    const names = arrangeNamesMFM();
+    names.forEach((name)=>{
+      const d=document.createElement('div'); d.className='desk';
+      d.classList.add(FEMALES.has(name)?'female':'male');
+      d.innerHTML = `
+        <div class="name">${name}</div>
+        <div class="role">${name==='橋本淑雅'?'（あなた）':'クラスメイト'}</div>
+        <div class="bubble"></div>
+      `;
+      d.addEventListener('click',()=> showBubble(d, name));
+      desks.appendChild(d);
     });
+  }
 
-    // 列あたりの必要行数を概算
-    const maleCols = genders.filter(g=>g==='male').length || 1;
-    const femaleCols = genders.filter(g=>g==='female').length || 1;
-    const maleRows = Math.ceil(males.length / maleCols);
-    const femaleRows = Math.ceil(females.length / femaleCols);
-    const maxRows = Math.max(maleRows, femaleRows);
+  function tickOnce(){
+    const desks = Array.from(document.querySelectorAll('#desks .desk'));
+    if(desks.length===0) return;
+    const now = Date.now();
+    const count = randomEmissionCount();
+    const candidates = desks
+      .map(el=>({el, name: el.querySelector('.name')?.textContent || ''}))
+      .filter(x=>x.name && (!lastSpokenAt.has(x.name) || (now - (lastSpokenAt.get(x.name)||0) > cooldownMs())))
+      // ミュートは除外
+      .filter(x=> (getLinesFor(x.name).length>0));
 
-    const maleQ = males.slice();
-    const femaleQ = females.slice();
+    if(candidates.length===0) return;
 
-    // 上から順に、各列に1つずつ供給（キューが尽きたらスキップ）
-    for(let r=0;r<maxRows;r++){
-      for(let i=0;i<cols;i++){
-        const g=genders[i];
-        const name = (g==='male') ? maleQ.shift() : femaleQ.shift();
-        if(!name) continue;
-        const d=document.createElement('div'); d.className='desk '+(g==='male'?'male':'female');
-        d.innerHTML = `
-          <div class="name">${name}</div>
-          <div class="role">${name==='橋本淑雅'?'（あなた）':'クラスメイト'}</div>
-          <div class="bubble"></div>
-        `;
-        d.addEventListener('click',()=> showBubble(d, name));
-        colEls[i].appendChild(d);
-      }
+    // 無作為に count 人（重複なし）
+    for(let i=0; i<count && candidates.length>0; i++){
+      const idx = Math.floor(Math.random()*candidates.length);
+      const pick = candidates.splice(idx,1)[0];
+      showBubble(pick.el, pick.name);
     }
   }
 
-  /* ========== 台詞編集ページ ========== */
-  function buildLinesEditor(){
-    const wrap=$('#linesWrap'); if(!wrap) return; wrap.innerHTML='';
+  function startClassTicker(){
+    stopClassTicker();
+    classTicker = setInterval(tickOnce, baseTickMs());
+  }
+  function stopClassTicker(){
+    if(classTicker){ clearInterval(classTicker); classTicker=null; }
+  }
+  function restartClassTicker(){
+    stopClassTicker(); startClassTicker();
+  }
+
+  /* ========== Page4: セリフ編集UI ========== */
+  function renderEditPage(){
+    const grid = $('#editGrid'); if(!grid) return;
+    grid.innerHTML='';
     CLASSMATES.forEach(name=>{
-      const card=document.createElement('div'); card.className='lines-card';
-      const taId='ta_'+btoa(unescape(encodeURIComponent(name))).replace(/=+/g,'');
-      const used = getLinesFor(name);
+      const card = document.createElement('div');
+      card.className='card';
+      const id = 'ta_'+btoa(unescape(encodeURIComponent(name))).replace(/=+/g,'');
+      const lines = getLinesFor(name); // 現状（空配列=ミュート）
+      const text = (Object.prototype.hasOwnProperty.call(customLines, name) ? customLines[name] : lines).join('\n');
       card.innerHTML = `
-        <div class="lines-head">
-          <div class="name-badge">${name} <span class="muted">（${FEMALES.has(name)?'女子':'男子'}）</span></div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <button class="smallbtn" data-reset>既定へ戻す</button>
-          </div>
+        <h4>${name}</h4>
+        <textarea id="${id}" placeholder="1行=1セリフ。空にするとミュート">${escapeHtml(text)}</textarea>
+        <div class="row">
+          <button data-name="${name}" class="btnClear">ミュート（空にする）</button>
+          <span class="muted">現在 ${lines.length} 件</span>
         </div>
-        <div class="muted" style="margin:6px 0">1行=1フレーズ。空行は無視。</div>
-        <textarea id="${taId}" data-name="${name}">${used.join('\n')}</textarea>
       `;
-      const btnReset = card.querySelector('[data-reset]');
-      btnReset.addEventListener('click',()=>{
-        customLines[name] = (defaultLines[name]||BASE_GENERAL).slice();
-        const ta=card.querySelector('textarea'); ta.value = customLines[name].join('\n');
+      grid.appendChild(card);
+      const ta = card.querySelector('textarea');
+      ta.addEventListener('input',()=>{
+        const v = String(ta.value||'');
+        const arr = v.split('\n').map(s=>s.trim()).filter(s=>s.length>0);
+        // 入力が空→ミュートとして空配列を保持
+        customLines[name] = arr;
+        scheduleLinesSave();
       });
-      wrap.appendChild(card);
+      card.querySelector('.btnClear').addEventListener('click',()=>{
+        customLines[name] = [];
+        const ta2 = card.querySelector('textarea'); ta2.value='';
+        scheduleLinesSave();
+      });
     });
   }
-  function saveAllLines(){
-    const wrap=$('#linesWrap');
-    const tas = Array.from(wrap.querySelectorAll('textarea'));
-    tas.forEach(ta=>{
-      const name = ta.getAttribute('data-name');
-      const arr = ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
-      customLines[name] = arr;
-    });
-    saveCustomLines(customLines);
-    alert('台詞を保存しました（②ページに反映されます）');
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
-  function resetAllLines(){
-    if(!confirm('すべてを既定に戻します。よろしいですか？')) return;
-    customLines = {};
-    saveCustomLines(customLines);
-    buildLinesEditor();
-    alert('既定に戻しました');
-  }
+
+  // 書き出し/読み込み（JSON）
+  $('#exportLines').addEventListener('click',()=>{
+    const blob = new Blob([JSON.stringify(customLines, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'class_lines.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+  $('#importLinesFile').addEventListener('change',async(e)=>{
+    const f=e.target.files?.[0]; if(!f) return;
+    try{
+      const txt=await f.text();
+      const obj=JSON.parse(txt);
+      if(obj && typeof obj==='object'){ customLines = obj; saveCustomLines(); renderEditPage(); }
+    }catch(_){ alert('JSONの読み込みに失敗しました'); }
+    e.target.value='';
+  });
 
   /* ====== イベント ====== */
   (function initName(){
     const saved=localStorage.getItem(NAME_KEY);
-    $('#displayName').value = saved || '橋本淑雅';
+    const me = saved || '橋本淑雅';
+    $('#displayName').value = me;
+    $('#meOnBoard').textContent = me;
   })();
-  $('#saveName').addEventListener('click',()=>{ localStorage.setItem(NAME_KEY, ($('#displayName').value||'橋本淑雅').trim()); renderRank(); });
+  $('#saveName').addEventListener('click',()=>{
+    const me = ($('#displayName').value||'橋本淑雅').trim();
+    localStorage.setItem(NAME_KEY, me);
+    $('#meOnBoard').textContent = me;
+    renderRank();
+  });
 
   // タブ
-  function showPage(which){
-    const p1=$('#pageProgress'), p2=$('#pageClass'), p3=$('#pageRank'), p4=$('#pageLines');
-    const t1=$('#tabProgress'), t2=$('#tabClass'), t3=$('#tabRank'), t4=$('#tabLines');
-    const show = (a,b)=>{ a.style.display='block'; b.forEach(x=>x.style.display='none'); };
-    if(which==='progress'){
-      show(p1,[p2,p3,p4]); t1.classList.add('active'); t2.classList.remove('active'); t3.classList.remove('active'); t4.classList.remove('active');
-      stopClassTicker(); renderProgress();
-    }
-    if(which==='class'){
-      show(p2,[p1,p3,p4]); t2.classList.add('active'); t1.classList.remove('active'); t3.classList.remove('active'); t4.classList.remove('active');
-      // スピードUI初期化
-      $('#speedBoost').value = getBoost();
-      $('#speedInfo').textContent = `現在：${getBoost()}%`;
-      buildClassroom(); startClassTicker();
-    }
-    if(which==='rank'){
-      show(p3,[p1,p2,p4]); t3.classList.add('active'); t1.classList.remove('active'); t2.classList.remove('active'); t4.classList.remove('active');
-      stopClassTicker(); renderRank();
-    }
-    if(which==='lines'){
-      show(p4,[p1,p2,p3]); t4.classList.add('active'); t1.classList.remove('active'); t2.classList.remove('active'); t3.classList.remove('active');
-      stopClassTicker(); buildLinesEditor();
-    }
-  }
   $('#tabProgress').addEventListener('click',()=>{ showPage('progress'); setTimeout(scrollTodayIntoView,0); });
   $('#tabClass').addEventListener('click',()=>showPage('class'));
   $('#tabRank').addEventListener('click',()=>showPage('rank'));
-  $('#tabLines').addEventListener('click',()=>showPage('lines'));
+  $('#tabEdit').addEventListener('click',()=>showPage('edit'));
 
-  // ページ送り
-  const PAGES = ['progress','class','rank','lines'];
+  function setActiveTab(t1,t2,t3,t4){
+    $('#tabProgress').classList.toggle('active', t1);
+    $('#tabClass').classList.toggle('active', t2);
+    $('#tabRank').classList.toggle('active', t3);
+    $('#tabEdit').classList.toggle('active', t4);
+  }
+
+  function showPage(which){
+    const p1=$('#pageProgress'), p2=$('#pageClass'), p3=$('#pageRank'), p4=$('#pageEdit');
+    const show = (a,b)=>{ a.style.display='block'; b.forEach(x=>x.style.display='none'); };
+    if(which==='progress'){
+      show(p1,[p2,p3,p4]); setActiveTab(true,false,false,false);
+      stopClassTicker(); renderProgress();
+    }
+    if(which==='class'){
+      show(p2,[p1,p3,p4]); setActiveTab(false,true,false,false);
+      buildClassroom(); restartClassTicker();
+    }
+    if(which==='rank'){
+      show(p3,[p1,p2,p4]); setActiveTab(false,false,true,false);
+      stopClassTicker(); renderRank();
+    }
+    if(which==='edit'){
+      show(p4,[p1,p2,p3]); setActiveTab(false,false,false,true);
+      stopClassTicker(); renderEditPage();
+    }
+  }
+  const PAGES = ['progress','class','rank','edit'];
   function pageIndexNow(){
     if($('#pageProgress').style.display!=='none') return 0;
     if($('#pageClass').style.display!=='none') return 1;
@@ -844,7 +882,7 @@
     const i = pageIndexNow(); const ni = (i+1)%4; showPage(PAGES[ni]); if(ni===0) setTimeout(scrollTodayIntoView,0);
   });
 
-  // 月移動（保存してから）
+  // 月移動
   $('#prev').addEventListener('click',()=>{ pushHistory(); flushAutoSave(); month-=1; if(month<0){month=11;year-=1;} load(); renderProgress(); renderRank(); });
   $('#next').addEventListener('click',()=>{ pushHistory(); flushAutoSave(); month+=1; if(month>11){month=0;year+=1;} load(); renderProgress(); renderRank(); });
 
@@ -881,28 +919,19 @@
       const n = importAnyText(text) || parseTypeImport(text||'');
       renderProgress(); renderRank();
       alert(n?`OCR取込で当月に ${n} 件反映しました`:'文字が認識できないか、当月データが見つかりませんでした');
-    }catch(_){ alert('OCRに失敗しました。画像の鮮明さ・照明・傾きを確認してください。'); }
-    finally{ e.target.value=''; }
-  });
-
-  // クラスページ：スピード反映
-  $('#applySpeed').addEventListener('click',()=>{
-    const v = parseInt($('#speedBoost').value||'0',10) || 0;
-    setBoost(v);
-    $('#speedInfo').textContent = `現在：${v}%`;
-    if($('#pageClass').style.display!=='none'){ startClassTicker(); } // 反映
+    }catch(err){
+      alert('OCRに失敗しました。画像の鮮明さ・照明・傾きを確認してください。');
+    }finally{
+      e.target.value='';
+    }
   });
 
   // Undo/Redo/全削除
   $('#undoP').onclick = $('#undoC').onclick = $('#undoT').onclick = ()=>{ undo(); setTimeout(scrollTodayIntoView,0); };
   $('#redoP').onclick = $('#redoC').onclick = $('#redoT').onclick = ()=>{ redo(); setTimeout(scrollTodayIntoView,0); };
   $('#wipeP').onclick = ()=>{ if(confirm('当月の進捗を初期化します。よろしいですか？')){ pushHistory(); monthDates(year,month).forEach(ds=>{ const r=rows.find(x=>x.date===ds); if(r){ r.type='学習'; r.goal=''; r.result=''; r.review=''; r.color='normal'; persist(r);} }); touch(); renderProgress(); renderRank(); } };
-  $('#wipeC').onclick = ()=>{ if(confirm('Cページの発話状態をリセットしますか？')){ recentLines.length=0; lastSpeaker={name:null,ts:0}; } };
+  $('#wipeC').onclick = ()=>{ if(confirm('Cページの発話状態をリセットしますか？')){ recentLines.length=0; lastSpokenAt.clear(); buildClassroom(); } };
   $('#wipeT').onclick = ()=>{ if(confirm('ランキング表示を再計算しますか？')){ renderRank(); } };
-
-  // ④ページ：台詞保存／既定に戻す
-  $('#saveAllLines').addEventListener('click', saveAllLines);
-  $('#resetAllLines').addEventListener('click', resetAllLines);
 
   // 🐹＝ホーム＆今日へ
   $('#fabHome').addEventListener('click',()=>{ showPage('progress'); setTimeout(scrollTodayIntoView,0); });
@@ -913,12 +942,28 @@
     location.replace(url);
   });
 
-  // 画面サイズ変化で教室レイアウト再構成（教室ページ表示時のみ）
-  let resizeTimer=null;
-  window.addEventListener('resize', ()=>{
-    if($('#pageClass').style.display==='none') return;
-    if(resizeTimer) cancelAnimationFrame(resizeTimer);
-    resizeTimer = requestAnimationFrame(()=>{ buildClassroom(); });
+  // ②ページ 速さ%増し
+  (function initBoost(){
+    const saved = localStorage.getItem(BOOST_KEY);
+    const v = saved ? Number(saved) : 0;
+    $('#boostInput').value = String(isFinite(v)?v:0);
+    updateBoostHint();
+  })();
+  function updateBoostHint(){
+    const v = getBoost();
+    $('#boostHint').textContent = `（現在: ${v}%増し / 間隔と吹き出し時間を短縮）`;
+  }
+  $('#applyBoost').addEventListener('click',()=>{
+    const v = getBoost();
+    localStorage.setItem(BOOST_KEY, String(v));
+    updateBoostHint();
+    restartClassTicker();
+  });
+  $('#boostInput').addEventListener('change',()=>{
+    const v = getBoost();
+    localStorage.setItem(BOOST_KEY, String(v));
+    updateBoostHint();
+    restartClassTicker();
   });
 
   // 初期化
@@ -926,11 +971,11 @@
     const p1 = $('#pageProgress').style.display!=='none';
     const p2 = $('#pageClass').style.display!=='none';
     const p3 = $('#pageRank').style.display!=='none';
-    const p4 = $('#pageLines').style.display!=='none';
+    const p4 = $('#pageEdit').style.display!=='none';
     if(p1) renderProgress();
-    if(p2) { buildClassroom(); startClassTicker(); }
+    if(p2) { buildClassroom(); restartClassTicker(); }
     if(p3) renderRank();
-    if(p4) buildLinesEditor();
+    if(p4) renderEditPage();
   }
   (function init(){
     // 旧キー移行
