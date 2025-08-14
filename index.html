@@ -1,524 +1,647 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Study Planner – 完全版</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Study Planner – 1ヶ月表示（学習/休日トグル＋貼付/CSV/OCR）& クラスメイト</title>
+
+<!-- 画像OCR用（iPadのみで完結）：失敗時は英語モデルにフォールバック -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+
 <style>
   :root{
-    --bg:#f5f7fb; --card:#fff; --bubble:#f7f9fc; --line:#e6ebf3;
-    --text:#1b2430; --muted:#6b7684; --pri:#1a73e8; --err:#d32f2f;
-    --male:#1E88E5; --female:#FB8C00;
+    --line:#e5e7eb; --muted:#6b7280;
+    --today-bg:#005A9C; --today-text:#ffffff;           /* 本日：ドジャースブルー */
+    --row-gray-bg:#b0a89f; --row-gray-text:#000000;     /* 完了：ジャンガリアン灰 */
+    --header-bg:#ffffff; --header-shadow:0 6px 12px rgba(0,0,0,.06);
+    --accent:#2563eb;
+    --board:#0f3b3f; --board-frame:#2f4f4f; --desk:#ffffff; --room:#f7fafc;
+
+    --bubble-gen-bg:#f4f8ff;   --bubble-gen-bd:#d6e6ff;  /* 一般: 淡ブルー */
+    --bubble-fam-bg:#fff9ec;   --bubble-fam-bd:#ffe5ad;  /* 有名:  クリーム */
+
+    --scale: 1; /* 一覧表示切替用スケール（1=標準, 0.75=詰め）*/
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);
-       font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Sans","Noto Sans JP","Yu Gothic UI","YuGothic",Meiryo,sans-serif}
-  .top{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);
-       padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  .brand{font-weight:800;margin-right:auto}
-  .nav button{padding:8px 10px;border:1px solid var(--line);background:#fff;border-radius:10px;cursor:pointer;min-width:40px;font-weight:700}
-  .nav button.active{background:#eef4ff;border-color:#c7d6ff}
-  .tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .btn,.file-label{padding:8px 12px;border:1px solid var(--line);background:#fff;border-radius:10px;cursor:pointer}
-  .btn.primary{background:var(--pri);color:#fff;border-color:var(--pri)}
-  .ghost{background:#fff}
-  .sheet-url{width:280px;max-width:70vw;padding:8px 10px;border:1px solid var(--line);border-radius:10px}
-  .alert{position:sticky;top:56px;z-index:19;margin:0;padding:8px 12px;background:#ffecec;color:#b00020;border-bottom:1px solid #ffcdd2;display:none}
-  main{padding:16px;max-width:1200px;margin:0 auto}
-  .page{display:none}.page.active{display:block}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
-  .muted{color:var(--muted)} .hint{font-size:13px;color:var(--muted)}
-  /* 進捗テーブル */
-  .grid{width:100%;border-collapse:separate;border-spacing:0}
-  .grid th,.grid td{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left;background:#fff;vertical-align:top}
-  .grid th{background:#f1f5ff;font-weight:700}
-  input[type="date"],input[type="text"],select,textarea{padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff}
-  .row{display:flex;gap:8px;flex-wrap:wrap}
-  /* クラスメート */
-  .page-2{display:grid;grid-template-columns:1fr 2fr;gap:16px}
-  .list,.words{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
-  .student{padding:8px 10px;border-radius:10px;background:#fff;border:1px solid var(--line);margin:8px 0}
-  .student .name{font-weight:700}
-  .word{padding:8px 10px;margin:6px 0;border-radius:10px;background:var(--bubble);line-height:1.6;border:1px solid var(--line)}
-  .word.male{color:var(--male)} .word.female{color:var(--female)}
-  /* ランキング */
-  .rank{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
-  .rank-list{column-width:240px;column-gap:16px;list-style:none;margin:0;padding:0}
-  .rank-list li{break-inside:avoid;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0;display:block}
-  .rank-list .male{border-left:4px solid var(--male)} .rank-list .female{border-left:4px solid var(--female)}
-  .rank-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .rank-no{font-weight:800;min-width:3.5em}
-  /* カレンダー */
-  .cal-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
-  .cal-head h2{margin:0 8px 0 0}
-  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
-  .dow{font-weight:700;color:#3b4557}
-  .day{background:#fff;border:1px solid var(--line);border-radius:10px;min-height:96px;padding:8px;display:flex;flex-direction:column}
-  .day .date{font-weight:700;margin-bottom:4px}
-  .day .pill{display:inline-block;padding:2px 6px;margin:2px 2px 0 0;border-radius:999px;font-size:12px;border:1px solid var(--line);background:#f7faff}
-  .pill.L{background:#e3f2fd} .pill.R{background:#fff3e0}
-  .pill.V{background:#e8f5e9}
-  .none{opacity:.35}
-  .legend{display:flex;gap:8px;flex-wrap:wrap}
-  .badge{display:inline-block;padding:2px 6px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:12px}
-  .badge.L{background:#e3f2fd} .badge.R{background:#fff3e0} .badge.V{background:#e8f5e9}
-  @media (max-width:860px){.page-2{grid-template-columns:1fr}}
+  body{margin:0;padding:14px;font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",sans-serif;color:#111827;background:#fff}
+  body.compact{--scale:0.72;} /* 一覧表示（詰め）モード */
+
+  h1{margin:0 0 calc(12px*var(--scale));font-size:calc(18px*var(--scale))}
+  .topbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:calc(8px*var(--scale))}
+  .muted{color:var(--muted);font-size:calc(12px*var(--scale))}
+  button,input[type="text"],input[type="file"]{
+    padding:calc(10px*var(--scale)) calc(12px*var(--scale));
+    border:1px solid var(--line);border-radius:12px;background:#fff;
+    font-size:calc(16px*var(--scale))
+  }
+  button.primary{background:var(--accent);border-color:#2563eb;color:#fff}
+  .tabs{display:flex;gap:8px;margin:6px 0 10px}
+  .tab{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:#fff}
+  .tab.active{background:#eef2ff;border-color:#c7d2fe}
+
+  /* 今日バナー */
+  .today-banner{
+    margin:6px 0 10px;padding:8px 12px;border:1px solid var(--line);
+    border-radius:10px;background:#f8fafc;font-size:calc(14px*var(--scale))
+  }
+
+  /* 表（進捗） */
+  .tbl{
+    width:100%;border:1px solid var(--line);border-radius:12px;overflow:auto;
+    max-height:calc(84vh*var(--scale)); /* できる限り1画面に収める */
+  }
+  table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+  th,td{padding:calc(8px*var(--scale));border-bottom:1px solid var(--line);vertical-align:top;background:#fff}
+  th{
+    text-align:left;font-weight:600;font-size:calc(12px*var(--scale));color:var(--muted);
+    position:sticky;top:0;z-index:3;background:var(--header-bg);
+    border-bottom:2px solid var(--line);box-shadow:var(--header-shadow);backdrop-filter:saturate(1.1);
+  }
+  td.padL{padding-left:calc(14px*var(--scale))}
+  td.small{width:calc(110px*var(--scale))}
+  td.medium{width:calc(160px*var(--scale))}
+  tr.today td{background:var(--today-bg)!important;color:var(--today-text)!important}
+  tr.manual-gray td{background:var(--row-gray-bg)!important;color:var(--row-gray-text)!important}
+
+  /* 種別：表示＋小トグル */
+  .type-wrap{display:flex;align-items:center;gap:8px}
+  .type-badge{font-weight:700}
+  .type-toggle{
+    padding:calc(4px*var(--scale)) calc(8px*var(--scale));
+    border:1px solid var(--line);border-radius:10px;background:#fff;
+    font-size:calc(12px*var(--scale));cursor:pointer
+  }
+
+  /* 右上/右下：本日へ（右下はジャンガリアハムスター） */
+  .fab{
+    position:fixed;z-index:5;width:54px;height:54px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;border:1px solid var(--line);background:#fff;
+    box-shadow:0 10px 20px rgba(0,0,0,.12);user-select:none;-webkit-user-select:none
+  }
+  .fab:hover{transform:translateY(-1px)} .fab:active{transform:translateY(0)}
+  .fab-top-right{right:14px;top:14px} .fab-bottom-right{right:14px;bottom:14px}
+  .fab span{font-size:22px;line-height:1}
+
+  /* 教室ページ */
+  .layout2{display:grid;gap:12px;grid-template-columns:minmax(0,1fr) 330px;align-items:start}
+  .blackboard{border-radius:10px;border:2px solid var(--board-frame);background:var(--board);color:#e0f2f1;padding:10px 12px;font-weight:600;margin-bottom:10px}
+  .room{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--room);max-height:80vh;overflow:auto}
+  .desks{
+    display:grid;gap:12px;
+    grid-template-columns:repeat(3, minmax(0,1fr));
+  }
+  .desk{
+    background:var(--desk);border:1px solid var(--line);border-radius:12px;padding:10px;
+    min-height:110px;display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden
+  }
+  .desk .name{font-weight:700}
+  .desk .role{font-size:12px;color:var(--muted)}
+
+  /* 机の内側に出す尾付き吹き出し（名前に少し重なってOK） */
+  .bubble{
+    position:absolute;left:8px;right:8px;top:8px;
+    border:1px solid var(--bubble-gen-bd);background:var(--bubble-gen-bg);
+    border-radius:12px;padding:8px 10px;font-size:14px;box-shadow:0 6px 12px rgba(0,0,0,.06);
+    display:none;max-width:unset;white-space:pre-line
+  }
+  .bubble::after{
+    content:"";position:absolute;left:22px;bottom:-10px;
+    border-width:10px 10px 0 10px;border-style:solid;border-color:var(--bubble-gen-bd) transparent transparent transparent;
+  }
+  .bubble::before{
+    content:"";position:absolute;left:22px;bottom:-9px;
+    border-width:9px 9px 0 9px;border-style:solid;border-color:var(--bubble-gen-bg) transparent transparent transparent;
+  }
+  .bubble.famous{background:var(--bubble-fam-bg);border-color:var(--bubble-fam-bd)}
+  .bubble.famous::after{border-top-color:var(--bubble-fam-bd)}
+  .bubble.famous::before{border-top-color:var(--bubble-fam-bg)}
+  .bubble.show{display:block;animation:fadeIn .15s ease}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+
+  /* 順位カード（教室の右側） */
+  .card{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff}
+  .card h3{margin:0 0 8px;font-size:15px}
+  .lb-row{display:flex;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px dashed var(--line)}
+  .lb-row:last-child{border-bottom:none}
+  .me{background:#eef2ff;border-radius:8px}
+  .rank{width:26px;text-align:center;font-weight:700}
+  .pts{font-variant-numeric:tabular-nums}
+  .chip{display:inline-block;padding:2px 8px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:12px;color:#374151}
 </style>
 </head>
 <body>
-<header class="top">
-  <div class="brand">Study Planner</div>
-  <nav class="nav">
-    <button id="nav-home" class="active">Home</button>
-    <button id="nav-cal">Cal</button>
-    <button id="nav-progress">P</button>
-    <button id="nav-classmates">C</button>
-    <button id="nav-test">T</button>
-  </nav>
-  <div class="tools">
-    <button id="btn-load" class="btn">読み込み</button>
-    <button id="btn-save" class="btn">保存</button>
-    <label class="file-label" for="csv-students">生徒CSV</label>
-    <input id="csv-students" type="file" accept=".csv,text/csv" style="display:none">
-    <label class="file-label" for="csv-progress">進捗CSV</label>
-    <input id="csv-progress" type="file" accept=".csv,text/csv" style="display:none">
-    <input id="sheet-url" class="sheet-url" placeholder="公開CSV URL（生徒 or 進捗 CSV）">
-    <button id="btn-sync" class="btn ghost">URL取込</button>
-    <button id="btn-demo" class="btn ghost">デモ投入</button>
+  <h1>学習計画（1ヶ月表示）</h1>
+
+  <!-- 表示名（順位や呼びかけに使用） -->
+  <div class="topbar">
+    <input id="displayName" type="text" placeholder="表示名（例：とし）" style="min-width:200px">
+    <button id="saveName">保存</button>
+    <span class="muted">※保存すると呼びかけ・順位に反映</span>
   </div>
-</header>
-<div id="alert" class="alert"></div>
 
-<main>
-  <!-- Home -->
-  <section id="home" class="page active">
-    <div class="card">
-      <h2>ようこそ</h2>
-      <p class="muted">Cal=月間カレンダー、P=進捗一覧、C=クラスメート（褒め言葉）、T=ポイント順位。保存はブラウザ内（localStorage）。</p>
-      <ul class="hint">
-        <li>生徒CSV…<code>id,name,gender,points,comment</code>（gender: <b>male/female</b>）</li>
-        <li>進捗CSV…<code>date,type,mainRange,minRange,result,memo</code></li>
-        <li>Sheetsは「リンク公開CSV（/export?format=csv）」のURLを入力して「URL取込」</li>
-      </ul>
-    </div>
-    <div class="card">
-      <h3>最近の進捗（最新10件）</h3>
-      <div id="home-progress"></div>
-    </div>
-  </section>
+  <!-- ページタブ -->
+  <div class="tabs">
+    <button id="tabProgress" class="tab active">進捗</button>
+    <button id="tabClass" class="tab">C</button>
+  </div>
 
-  <!-- Calendar -->
-  <section id="cal" class="page">
-    <div class="card">
-      <div class="cal-head">
-        <h2 id="cal-title">カレンダー</h2>
-        <button id="cal-prev" class="btn">◀︎</button>
-        <button id="cal-today" class="btn">今月</button>
-        <button id="cal-next" class="btn">▶︎</button>
-        <div class="legend">
-          <span class="badge L">学習</span>
-          <span class="badge R">復習</span>
-          <span class="badge V">休み</span>
-        </div>
-      </div>
-      <div class="cal" id="cal-grid"></div>
+  <!-- ===== Page 1: 進捗 ===== -->
+  <section id="pageProgress" style="display:block">
+    <div class="topbar">
+      <button id="prev" class="primary">◀ 前月</button>
+      <div id="label" class="muted"></div>
+      <button id="next" class="primary">次月 ▶</button>
+      <button id="todayBtn">⟳ 今日へ</button>
+      <button id="save">💾 更新/保存</button>
+      <button id="load">📥 読込</button>
+      <button id="toggleCompact">🗂 一覧表示</button>
     </div>
-  </section>
 
-  <!-- Progress -->
-  <section id="progress" class="page">
-    <div class="card">
-      <h2>進捗</h2>
-      <div class="row" style="margin-bottom:10px">
-        <input id="pg-date" type="date">
-        <select id="pg-type">
-          <option value="学習">学習</option>
-          <option value="復習">復習</option>
-          <option value="休み">休み</option>
-          <option value="テスト">テスト</option>
-        </select>
-        <input id="pg-main" type="text" placeholder="メイン範囲（例：18,23）">
-        <input id="pg-min" type="text" placeholder="最低範囲（例：18）">
-        <input id="pg-result" type="text" placeholder="結果（例：18）">
-        <input id="pg-memo" type="text" placeholder="メモ">
-        <button id="pg-add" class="btn primary">追加</button>
-        <button id="pg-clear" class="btn ghost">全削除</button>
-      </div>
+    <!-- 取り込み（貼付 / CSV/TSV / 画像OCR） -->
+    <div class="topbar">
+      <button id="importPaste">📋 貼り付け取込</button>
+      <label>
+        <input id="importFile" type="file" accept=".csv,.tsv,.txt" style="display:none">
+        <button onclick="document.getElementById('importFile').click()">📄 CSV/TSV/TXT取込</button>
+      </label>
+      <label>
+        <input id="importImg" type="file" accept="image/*" style="display:none">
+        <button onclick="document.getElementById('importImg').click()">🖼 画像OCR取込</button>
+      </label>
+      <span class="muted">※形式例：<code>8/13 休日</code>、<code>8月14日 学習</code>、スプレシの2列コピー等</span>
     </div>
-    <div class="card">
-      <table class="grid" id="pg-table">
+
+    <div id="todayBanner" class="today-banner">本日: 読み込み中…</div>
+
+    <div class="tbl" id="scroller">
+      <table>
         <thead>
-          <tr><th>日付</th><th>種別</th><th>メイン範囲</th><th>最低範囲</th><th>結果</th><th>メモ</th></tr>
+          <tr>
+            <th class="medium">日付</th>
+            <th class="small padL">種別</th>
+            <th class="medium padL">目標（科目名）</th>
+            <th class="medium padL">結果</th>
+            <th class="medium padL">復習</th>
+            <th class="small padL">色</th>
+          </tr>
         </thead>
-        <tbody id="pg-body"></tbody>
+        <tbody id="tbody"></tbody>
       </table>
     </div>
+
+    <!-- 右上/右下：本日へ（右下は🐹） -->
+    <button class="fab fab-top-right" id="fabTop" title="今日へ"><span>📍</span></button>
+    <button class="fab fab-bottom-right" id="fabBottom" title="今日へ"><span>🐹</span></button>
   </section>
 
-  <!-- Classmates -->
-  <section id="classmates" class="page">
-    <div class="page-2">
-      <div class="list">
-        <h3>メンバー</h3>
-        <div id="student-list"></div>
+  <!-- ===== Page 2: クラスメイト ===== -->
+  <section id="pageClass" style="display:none">
+    <div class="blackboard">1年B組 – クラスメイトが「としくん」を全力応援！</div>
+    <div class="layout2">
+      <div class="room">
+        <div class="desks" id="desks"></div>
       </div>
-      <div class="words">
-        <h3>クラスメートの言葉（右側に拡張表示）</h3>
-        <div id="words-list"></div>
-      </div>
+      <aside class="card">
+        <h3>今月の順位（合計ポイント）</h3>
+        <div id="leaderboard"></div>
+        <div style="margin-top:8px" class="muted">
+          ルール：<span class="chip">完了=+10</span>、<span class="chip">復習+完了=+6</span>、休日=0。<br>
+          クラスメイトは日替わりで自動スコア（チートなし）。
+        </div>
+      </aside>
     </div>
   </section>
-
-  <!-- Ranking -->
-  <section id="test" class="page">
-    <div class="rank">
-      <h2>ポイント順位</h2>
-      <ol id="rank-list" class="rank-list"></ol>
-    </div>
-  </section>
-</main>
 
 <script>
-/* ====== ユーティリティ ====== */
-const STORAGE_KEY="study-planner:v3";
-function showAlert(msg){ const a=document.getElementById("alert"); a.textContent=msg; a.style.display="block"; setTimeout(()=>a.style.display="none", 4000); }
-function okId(){ try{ return crypto.randomUUID(); }catch{ return "id_"+Math.random().toString(36).slice(2,10); } }
-function esc(s){ return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
+(function(){
+  'use strict';
+  const KEY='studyplanner.v13.ocr';
+  const NAME_KEY='studyplanner.displayName';
 
-/* ====== 状態 ====== */
-const state = {
-  students: [],   // {id,name,gender('male'|'female'),points:number,comment}
-  progress: [],   // {date,type,mainRange,minRange,result,memo}
-  messages: []
-};
+  let year=(new Date()).getFullYear(), month=(new Date()).getMonth();
+  let rows=[]; // {date,type,goal,result,review,color}
 
-/* ====== 褒め言葉 ====== */
-const praisePool={
-  精度:["正確無比","丁寧で緻密","ブレがない","詰めが美しい","安定感抜群"],
-  速度:["展開が速い","反応が鋭い","切り替えが早い","テンポが良い","進みが軽快"],
-  発想:["着眼点が鋭い","発想が柔軟","切り口が新しい","発見が多い","視点が広い"],
-  継続:["積み上げが見事","継続力が光る","コツコツ型の強み","粘り強い","習慣化できている"]
-};
-const extraPraise=["判断が的確","説明が明快","段取りが良い","対応が速い","集中が深い","工夫が冴える","姿勢が安定","理解が早い","反省が上手","改善が速い","視野が広い","質問が良質","手際が良い","根拠が強い","メンタルが強い","配慮が細やか","言語化が上手","要点を掴む","再現性が高い","伸びしろが大きい"];
-const usedToday=new Set(); let praiseOrder=Object.keys(praisePool);
-function nextPraise(){
-  praiseOrder.push(praiseOrder.shift());
-  const cat=praiseOrder[0];
-  const cands=praisePool[cat].filter(p=>!usedToday.has(p));
-  if(cands.length===0){ usedToday.clear(); return nextPraise(); }
-  const p=cands[Math.floor(Math.random()*cands.length)];
-  usedToday.add(p); return p;
-}
+  const $=sel=>document.querySelector(sel);
+  const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const fromYmd=s=>{const [y,m,d]=s.split('-').map(Number); return new Date(y, m-1, d);};
+  const jpWeek=d=>'日月火水木金土'[d.getDay()];
+  const jpDateLabel=s=>{const d=fromYmd(s);return `${d.getMonth()+1}月${d.getDate()}日(${jpWeek(d)})`;};
+  function monthDates(y,m){const first=new Date(y,m,1), last=new Date(y,m+1,0), arr=[]; for(let d=new Date(first); d<=last; d.setDate(d.getDate()+1)) arr.push(ymd(d)); return arr;}
 
-/* ====== CSV（クォート対応） ====== */
-function parseCSVQuoted(text){
-  // BOM除去
-  if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
-  const rows=[]; let i=0, cur=[], cell="", inQ=false;
-  function pushCell(){ cur.push(cell); cell=""; }
-  function pushRow(){ rows.push(cur); cur=[]; }
-  while(i<text.length){
-    const ch=text[i];
-    if(inQ){
-      if(ch==='"' && text[i+1]==='"'){ cell+='"'; i+=2; continue; }
-      if(ch==='"' ){ inQ=false; i++; continue; }
-      cell+=ch; i++; continue;
-    }else{
-      if(ch==='"'){ inQ=true; i++; continue; }
-      if(ch===','){ pushCell(); i++; continue; }
-      if(ch==='\r'){ i++; continue; }
-      if(ch==='\n'){ pushCell(); pushRow(); i++; continue; }
-      cell+=ch; i++; continue;
+  function ensureScaffold(){
+    const need=new Set(monthDates(year,month));
+    const have=new Set(rows.map(r=>r.date));
+    need.forEach(d=>{ if(!have.has(d)) rows.push({date:d, type:'学習', goal:'', result:'', review:'', color:'normal'}); });
+    rows.sort((a,b)=>a.date.localeCompare(b.date));
+  }
+  function persist(rec){const i=rows.findIndex(x=>x.date===rec.date); if(i>=0) rows[i]=rec; else rows.push(rec);}
+
+  /* ===== 保存/読込（端末ローカル） ===== */
+  function save(){
+    const key=`${KEY}:${year}-${String(month+1).padStart(2,'0')}`;
+    const data=rows.filter(r=>fromYmd(r.date).getMonth()===month && fromYmd(r.date).getFullYear()===year);
+    localStorage.setItem(key, JSON.stringify(data));
+    // 更新後は自動で一覧（詰め）表示に切替
+    document.body.classList.add('compact');
+    alert('更新しました（この端末のブラウザ内）');
+    renderLeaderboard();
+  }
+  function load(){
+    const key=`${KEY}:${year}-${String(month+1).padStart(2,'0')}`;
+    const raw=localStorage.getItem(key);
+    if(!raw) return false;
+    try{
+      const data=JSON.parse(raw)||[];
+      const map=new Map(rows.map(r=>[r.date,r]));
+      data.forEach(d=>map.set(d.date,d));
+      rows=[...map.values()];
+      return true;
+    }catch(e){ return false; }
+  }
+
+  /* ====== 進捗テーブル（学習/休日トグル & コンパクト表示） ====== */
+  function renderProgress(){
+    ensureScaffold();
+    $('#label').textContent=`${year}年${month+1}月（${monthDates(year,month).length}日）`;
+    const tb=$('#tbody'); tb.innerHTML='';
+    const todayStr=ymd(new Date());
+
+    monthDates(year,month).forEach(date=>{
+      const r=rows.find(x=>x.date===date) || {date,type:'学習',goal:'',result:'',review:'',color:'normal'};
+      const tr=document.createElement('tr');
+
+      if(r.color==='gray') tr.classList.add('manual-gray');
+      else if(date===todayStr) tr.classList.add('today');
+
+      // 日付
+      const tdDate=document.createElement('td'); tdDate.className='medium'; tdDate.textContent=jpDateLabel(date);
+
+      // 種別（固定表示＋小トグル）
+      const tdType=document.createElement('td'); tdType.className='small padL';
+      const wrap=document.createElement('div'); wrap.className='type-wrap';
+      const badge=document.createElement('span'); badge.className='type-badge'; badge.textContent=(r.type==='休日')?'休日':'学習';
+      const btn=document.createElement('button'); btn.className='type-toggle'; btn.type='button';
+      btn.textContent=(r.type==='休日')?'学習にする':'休日にする';
+      btn.addEventListener('click',()=>{ r.type=(r.type==='休日')?'学習':'休日'; persist(r); renderProgress(); });
+      wrap.appendChild(badge); wrap.appendChild(btn); tdType.appendChild(wrap);
+
+      // 目標
+      const tdGoal=document.createElement('td'); tdGoal.className='medium padL';
+      const inGoal=document.createElement('input'); inGoal.type='text'; inGoal.placeholder='例：世界史 23〜24';
+      inGoal.value=r.goal||''; inGoal.addEventListener('input',e=>{ r.goal=e.target.value; persist(r); });
+      tdGoal.appendChild(inGoal);
+
+      // 結果
+      const tdRes=document.createElement('td'); tdRes.className='medium padL';
+      const inRes=document.createElement('input'); inRes.type='text'; inRes.placeholder='実績';
+      inRes.value=r.result||''; inRes.addEventListener('input',e=>{ r.result=e.target.value; persist(r); });
+      tdRes.appendChild(inRes);
+
+      // 復習
+      const tdRev=document.createElement('td'); tdRev.className='medium padL';
+      const inRev=document.createElement('input'); inRev.type='text'; inRev.placeholder='復習範囲';
+      inRev.value=r.review||''; inRev.addEventListener('input',e=>{ r.review=e.target.value; persist(r); });
+      tdRev.appendChild(inRev);
+
+      // 色（通常/完了）
+      const tdClr=document.createElement('td'); tdClr.className='small padL';
+      const selClr=document.createElement('select');
+      [{v:'normal',t:'通常'}, {v:'gray',t:'完了'}].forEach(p=>{
+        const o=document.createElement('option'); o.value=p.v; o.textContent=p.t;
+        if((r.color||'normal')===p.v) o.selected=true;
+        selClr.appendChild(o);
+      });
+      selClr.addEventListener('change',e=>{ r.color=e.target.value; persist(r); renderProgress(); renderLeaderboard(); });
+      tdClr.appendChild(selClr);
+
+      tr.appendChild(tdDate); tr.appendChild(tdType); tr.appendChild(tdGoal);
+      tr.appendChild(tdRes); tr.appendChild(tdRev); tr.appendChild(tdClr);
+      tb.appendChild(tr);
+    });
+
+    const t=new Date();
+    $('#todayBanner').textContent=`本日: ${t.getMonth()+1}月${t.getDate()}日(${jpWeek(t)})`;
+  }
+
+  function scrollTodayIntoView(){
+    const scroller=$('#scroller'); const thead=scroller.querySelector('thead');
+    const todayRow=scroller.querySelector('tr.today')||scroller.querySelector('tbody tr'); if(!todayRow) return;
+    const headerH=thead.getBoundingClientRect().height; const rowTop=todayRow.offsetTop;
+    scroller.scrollTo({top:Math.max(0,rowTop-headerH-4),behavior:'smooth'});
+  }
+
+  /* ====== 取り込み：貼付 / CSV/TSV / OCR（画像） ====== */
+  function parseTypeImport(text){
+    // 行ごとに 8/13 休日 / 8月13日 学習 / 8/13(水),休日 などを検出
+    const lines = (text||'').replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
+    const pairs=[];
+    const mNow=month+1, yNow=year;
+    const re = /(?:(\d{1,2})[\/\-月](\d{1,2})日?)(?:\([^)]*\))?[\s,　]*([^\s,　]+)/; // mm/dd or m月d日 + 種別
+    for(const ln of lines){
+      const m = ln.match(re);
+      if(m){
+        let mth=parseInt(m[1],10), day=parseInt(m[2],10);
+        let typ=(m[3]||'').replace(/\s/g,'').trim();
+        if(!/^(学習|休日|復習)$/u.test(typ)) continue;
+        // 月が省略/異なる場合でも、当月の同日へ反映（mth != mNow でも day は採用）
+        pairs.push({day, type:typ});
+        continue;
+      }
+      // 列がタブ/カンマ区切り： 8/13\t休日
+      const cols=ln.split(/[\t,， ]+/).map(s=>s.trim()).filter(Boolean);
+      if(cols.length>=2){
+        const d2=cols[0], t2=cols[1];
+        const m2 = d2.match(/(\d{1,2})[\/\-月](\d{1,2})/);
+        if(m2 && /^(学習|休日|復習)$/u.test(t2)){
+          pairs.push({day:parseInt(m2[2],10), type:t2});
+        }
+      }
+    }
+    // 反映
+    let applied=0;
+    for(const {day,type} of pairs){
+      const dateStr=ymd(new Date(year, month, day));
+      const r=rows.find(x=>x.date===dateStr);
+      if(r){ r.type=type; persist(r); applied++; }
+    }
+    return applied;
+  }
+
+  async function ocrImage(file){
+    try{
+      const worker = await Tesseract.createWorker('jpn');
+      const { data:{ text } } = await worker.recognize(file);
+      await worker.terminate();
+      return text;
+    }catch(e){
+      // 日本語モデルが取れない等 → 英語でリトライ
+      try{
+        const worker = await Tesseract.createWorker('eng');
+        const { data:{ text } } = await worker.recognize(file);
+        await worker.terminate();
+        return text;
+      }catch(err){
+        throw e;
+      }
     }
   }
-  // 最終セル
-  pushCell(); pushRow();
-  // 空行除去
-  return rows.filter(r=>r.join("").trim()!=="");
-}
-function parseCsvToObjects(text){
-  const rows=parseCSVQuoted(text);
-  const header=rows[0].map(s=>s.trim());
-  const objs=rows.slice(1).map(r=>{
-    const o={}; header.forEach((h,idx)=>o[h]=r[idx]?.trim()??""); return o;
-  });
-  return {header,rows:objs};
-}
-function isStudentHeader(h){ const need=["id","name","gender","points","comment"]; return need.every(x=>h.includes(x)); }
-function isProgressHeader(h){ const need=["date","type","mainRange","minRange","result","memo"]; return need.every(x=>h.includes(x)); }
 
-/* ====== マッピング ====== */
-function mapStudents(rows){
-  return rows.map(r=>({
-    id:String(r.id||okId()),
-    name:r.name||"",
-    gender:(r.gender==="female"?"female":"male"),
-    points:Number(r.points||0),
-    comment:r.comment||""
-  }));
-}
-function mapProgress(rows){
-  return rows.map(r=>({
-    date:r.date||"", type:r.type||"",
-    mainRange:r.mainRange||"", minRange:r.minRange||"",
-    result:r.result||"", memo:r.memo||""
-  }));
-}
-
-/* ====== 永続化 ====== */
-function save(){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  alert("保存しました");
-}
-function load(){
-  const raw=localStorage.getItem(STORAGE_KEY);
-  if(!raw) throw new Error("保存データが見つかりません");
-  const data=JSON.parse(raw);
-  state.students=data.students||[];
-  state.progress=data.progress||[];
-  state.messages=data.messages||[];
-}
-
-/* ====== レンダリング ====== */
-function setActive(id){
-  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
-  document.getElementById(id).classList.add("active");
-  document.querySelectorAll(".nav button").forEach(b=>b.classList.remove("active"));
-  const map={home:"nav-home",cal:"nav-cal",progress:"nav-progress",classmates:"nav-classmates",test:"nav-test"};
-  document.getElementById(map[id]).classList.add("active");
-  if(id==="home") renderHome();
-  if(id==="progress") renderProgress();
-  if(id==="classmates"){ renderStudents(); renderWords(); }
-  if(id==="test") renderRanking();
-  if(id==="cal") renderCalendar();
-}
-function renderHome(){
-  const host=document.getElementById("home-progress");
-  const latest=[...state.progress].sort((a,b)=> (b.date||"").localeCompare(a.date||"")).slice(0,10);
-  if(latest.length===0){ host.innerHTML='<div class="muted">進捗データがありません</div>'; return; }
-  host.innerHTML = `<table class="grid">
-    <thead><tr><th>日付</th><th>種別</th><th>メイン範囲</th><th>最低範囲</th><th>結果</th><th>メモ</th></tr></thead>
-    <tbody>${
-      latest.map(r=>`<tr><td>${esc(r.date)}</td><td>${esc(r.type)}</td><td>${esc(r.mainRange)}</td><td>${esc(r.minRange)}</td><td>${esc(r.result)}</td><td>${esc(r.memo)}</td></tr>`).join("")
-    }</tbody></table>`;
-}
-function renderProgress(){
-  const body=document.getElementById("pg-body");
-  if(state.progress.length===0){ body.innerHTML='<tr><td colspan="6" class="muted">進捗データがありません</td></tr>'; return; }
-  const rows=[...state.progress].sort((a,b)=> (a.date||"").localeCompare(b.date||""));
-  body.innerHTML = rows.map(r=>`<tr>
-    <td>${esc(r.date)}</td><td>${esc(r.type)}</td>
-    <td>${esc(r.mainRange)}</td><td>${esc(r.minRange)}</td>
-    <td>${esc(r.result)}</td><td>${esc(r.memo)}</td>
-  </tr>`).join("");
-}
-function renderStudents(){
-  const host=document.getElementById("student-list");
-  if(state.students.length===0){ host.innerHTML='<div class="muted">メンバー未登録</div>'; return; }
-  host.innerHTML = state.students.map(s=>`
-    <div class="student">
-      <div class="name">${esc(s.name)}</div>
-      <div class="muted">${s.gender==="female"?"女性":"男性"}／${s.points} pt</div>
-      ${s.comment?`<div class="muted">メモ：${esc(s.comment)}</div>`:""}
-    </div>`).join("");
-}
-function renderWords(){
-  const host=document.getElementById("words-list");
-  if(state.students.length===0){ host.innerHTML='<div class="muted">表示する言葉がありません</div>'; return; }
-  const out=[];
-  state.students.forEach(s=>{
-    const p1=nextPraise();
-    const p2=Math.random()<0.35?`・${extraPraise[Math.floor(Math.random()*extraPraise.length)]}`:"";
-    const c=s.comment?`（${esc(s.comment)}）`:"";
-    out.push(`<div class="word ${s.gender==='female'?'female':'male'}"><strong>${esc(s.name)}</strong>：${p1}${p2}${c}</div>`);
-  });
-  host.innerHTML=out.join("");
-}
-function renderRanking(){
-  const list=document.getElementById("rank-list");
-  if(state.students.length===0){ list.innerHTML='<li><div class="muted">データなし</div></li>'; return; }
-  const ranked=[...state.students].sort((a,b)=> b.points-a.points);
-  list.innerHTML = ranked.map((s,i)=>`
-    <li class="${s.gender==='female'?'female':'male'}">
-      <div class="rank-row">
-        <div class="rank-no">${i+1}位</div>
-        <div class="grow"><strong>${esc(s.name)}</strong></div>
-        <div>${s.points} pt</div>
-      </div>
-    </li>`).join("");
-}
-
-/* ====== カレンダー ====== */
-let calYear, calMonth; // month: 0-11
-function setCalToToday(){ const d=new Date(); calYear=d.getFullYear(); calMonth=d.getMonth(); }
-function ymd(dt){ const y=dt.getFullYear(), m=String(dt.getMonth()+1).padStart(2,"0"), d=String(dt.getDate()).padStart(2,"0"); return `${y}-${m}-${d}`; }
-function renderCalendar(){
-  if(calYear==null) setCalToToday();
-  const title=document.getElementById("cal-title");
-  title.textContent = `${calYear}年 ${calMonth+1}月`;
-  const grid=document.getElementById("cal-grid");
-  grid.innerHTML="";
-  // 曜日ヘッダ
-  const dows=["日","月","火","水","木","金","土"];
-  dows.forEach(w=>{
-    const h=document.createElement("div"); h.className="dow"; h.textContent=w; grid.appendChild(h);
-  });
-  // 月の開始
-  const first=new Date(calYear, calMonth, 1);
-  const start=new Date(first); start.setDate(first.getDate() - ((first.getDay()+7)%7)); // 日曜始まり
-  for(let i=0;i<42;i++){ // 6週
-    const dt=new Date(start); dt.setDate(start.getDate()+i);
-    const cell=document.createElement("div"); cell.className="day";
-    const inMonth = dt.getMonth()===calMonth;
-    if(!inMonth) cell.classList.add("none");
-    const n=document.createElement("div"); n.className="date"; n.textContent=dt.getDate();
-    cell.appendChild(n);
-    // その日の進捗を表示
-    const key=ymd(dt);
-    const items=state.progress.filter(r=>r.date===key);
-    items.forEach(it=>{
-      const p=document.createElement("span");
-      const t=it.type;
-      p.className="pill "+(t==="学習"?"L":t==="復習"?"R":t==="休み"?"V":"");
-      const label = it.type + (it.mainRange?`:${it.mainRange}`:"");
-      p.textContent=label;
-      cell.appendChild(p);
+  /* ====== ランキング ====== */
+  function myMonthlyPoints(){
+    let total=0;
+    monthDates(year,month).forEach(date=>{
+      const r=rows.find(x=>x.date===date); if(!r) return;
+      if(r.color==='gray'){ // 完了
+        if(r.type==='復習') total+=6;
+        else if(r.type==='学習') total+=10;
+      }
     });
-    grid.appendChild(cell);
+    return total;
   }
-}
-
-/* ====== 取り込み ====== */
-async function importFromUrl(url){
-  const res=await fetch(url,{cache:"no-store"});
-  if(!res.ok) throw new Error(`HTTP ${res.status}`);
-  const text=await res.text();
-  const {header,rows}=parseCsvToObjects(text);
-  applyImported(header,rows);
-}
-async function importCsvFile(file, kindHint){
-  const text=await file.text();
-  const {header,rows}=parseCsvToObjects(text);
-  applyImported(header,rows,kindHint);
-}
-function applyImported(header,rows,kindHint){
-  if(kindHint==="students" || isStudentHeader(header)){
-    mergeStudents(mapStudents(rows)); afterImport(); return;
+  function seedRand(seed){let x=seed%2147483647; if(x<=0)x+=2147483646; return ()=> (x=x*16807%2147483647)/2147483647;}
+  function classmatesMonthlyPoints(){
+    const seed=parseInt(`${year}${String(month+1).padStart(2,'0')}`);
+    const rnd=seedRand(seed); const dates=monthDates(year,month);
+    return CLASSMATES.filter(n=>n!=='（あなた）').map(name=>{
+      let sum=0; dates.forEach(()=>{const r=rnd(); if(r>0.65) sum+=10; else if(r>0.50) sum+=6;});
+      return {name, pts:sum};
+    });
   }
-  if(kindHint==="progress" || isProgressHeader(header)){
-    mergeProgress(mapProgress(rows)); afterImport(); return;
+  function renderLeaderboard(){
+    const meName=(($('#displayName').value)||'あなた').trim();
+    const mePts=myMonthlyPoints();
+    const rivals=classmatesMonthlyPoints();
+    const list=[...rivals,{name:meName,pts:mePts,me:true}].sort((a,b)=>b.pts-a.pts);
+    const box=$('#leaderboard'); if(!box) return;
+    box.innerHTML='';
+    list.forEach((p,i)=>{
+      const div=document.createElement('div'); div.className='lb-row'+(p.me?' me':'');
+      div.innerHTML=`<div style="display:flex;gap:8px;align-items:center">
+        <span class="rank">${i+1}</span><strong>${p.name}</strong></div>
+        <div class="pts">${p.pts} pt</div>`;
+      box.appendChild(div);
+    });
   }
-  throw new Error("CSVヘッダが不明です（生徒 or 進捗 形式）");
-}
-function mergeStudents(incoming){
-  const map=new Map(state.students.map(s=>[s.id,s]));
-  incoming.forEach(s=>map.set(s.id,s));
-  state.students=[...map.values()];
-}
-function mergeProgress(incoming){
-  const keyOf = r=>[r.date,r.type,r.mainRange,r.minRange,r.result,r.memo].join("|");
-  const map=new Map(state.progress.map(r=>[keyOf(r),r]));
-  incoming.forEach(r=>map.set(keyOf(r),r));
-  state.progress=[...map.values()];
-}
-function afterImport(){
-  const active=document.querySelector(".page.active")?.id;
-  if(active==="home") renderHome();
-  if(active==="cal") renderCalendar();
-  if(active==="progress") renderProgress();
-  if(active==="classmates"){ renderStudents(); renderWords(); }
-  if(active==="test") renderRanking();
-  alert("取り込み完了");
-}
 
-/* ====== イベント ====== */
-document.getElementById("nav-home").onclick = ()=>setActive("home");
-document.getElementById("nav-cal").onclick = ()=>setActive("cal");
-document.getElementById("nav-progress").onclick = ()=>setActive("progress");
-document.getElementById("nav-classmates").onclick = ()=>setActive("classmates");
-document.getElementById("nav-test").onclick = ()=>setActive("test");
-
-document.getElementById("btn-save").onclick=()=>{ try{ save(); }catch(e){ showAlert("保存に失敗: "+e.message); } };
-document.getElementById("btn-load").onclick=()=>{ try{ load(); renderHome(); renderCalendar(); renderProgress(); renderStudents(); renderWords(); renderRanking(); alert("読み込み完了"); }catch(e){ showAlert("読み込みに失敗: "+e.message); } };
-
-document.getElementById("csv-students").addEventListener("change", async e=>{
-  try{ const f=e.target.files?.[0]; if(!f) throw new Error("生徒CSVが選択されていません"); await importCsvFile(f,"students"); e.target.value=""; }
-  catch(err){ showAlert("生徒CSV取込失敗: "+err.message); }
-});
-document.getElementById("csv-progress").addEventListener("change", async e=>{
-  try{ const f=e.target.files?.[0]; if(!f) throw new Error("進捗CSVが選択されていません"); await importCsvFile(f,"progress"); e.target.value=""; }
-  catch(err){ showAlert("進捗CSV取込失敗: "+err.message); }
-});
-document.getElementById("btn-sync").onclick=async ()=>{
-  try{
-    const url=document.getElementById("sheet-url").value.trim();
-    if(!url) throw new Error("公開CSVのURLを入力してください");
-    await importFromUrl(url);
-  }catch(err){ showAlert("URL取込失敗: "+err.message); }
-};
-
-/* 進捗追加/削除 */
-document.getElementById("pg-add").onclick=()=>{
-  try{
-    const r={
-      date:document.getElementById("pg-date").value||"",
-      type:document.getElementById("pg-type").value||"",
-      mainRange:document.getElementById("pg-main").value||"",
-      minRange:document.getElementById("pg-min").value||"",
-      result:document.getElementById("pg-result").value||"",
-      memo:document.getElementById("pg-memo").value||""
-    };
-    if(!r.date) throw new Error("日付は必須です");
-    state.progress.push(r);
-    renderProgress(); renderHome(); renderCalendar();
-    alert("進捗を追加しました");
-  }catch(err){ showAlert("進捗追加失敗: "+err.message); }
-};
-document.getElementById("pg-clear").onclick=()=>{
-  if(!confirm("進捗を全て削除します。よろしいですか？")) return;
-  state.progress=[]; renderProgress(); renderHome(); renderCalendar();
-  alert("進捗を全削除しました");
-};
-
-/* カレンダー操作 */
-document.getElementById("cal-prev").onclick=()=>{ if(calYear==null)setCalToToday(); calMonth--; if(calMonth<0){calMonth=11; calYear--;} renderCalendar(); };
-document.getElementById("cal-next").onclick=()=>{ if(calYear==null)setCalToToday(); calMonth++; if(calMonth>11){calMonth=0; calYear++;} renderCalendar(); };
-document.getElementById("cal-today").onclick=()=>{ setCalToToday(); renderCalendar(); };
-
-/* デモ投入（空のときの見た目確認用） */
-document.getElementById("btn-demo").onclick=()=>{
-  if(!confirm("デモデータを投入しますか？既存データに追加されます。")) return;
-  // 生徒
-  const demoS=[
-    {id:okId(),name:"山田太郎",gender:"male",points:120,comment:"すごい集中力"},
-    {id:okId(),name:"田中花子",gender:"female",points:140,comment:"丁寧で正確"},
-    {id:okId(),name:"佐藤健",gender:"male",points:110,comment:"発想が柔軟"},
-    {id:okId(),name:"鈴木愛",gender:"female",points:150,comment:"段取りが良い"}
+  /* ====== クラスメイト（大量追加＆よりランダム） ====== */
+  const CLASSMATES = [
+    '（あなた）',
+    // 既存
+    'いか','永田秀仁','高橋','嶋康','田中','池之内英明','加藤','唐杉先生','成木洋平','佐々木','富田雄二','富島雅人',
+    'ぷろたん','大森元木','橋本範之','米山隆一','ひろゆき',
+    // 追加（有名人多数）
+    '望月亜希子','綾瀬はるか','吉瀬美智子','永野芽郁','石原さとみ','北川景子','有村架純','長澤まさみ','広瀬すず','深田恭子',
+    '吉岡美穂','本田翼','橋本洋子','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀','荒井さん',
+    '多部未華子','戸田恵梨香','広瀬アリス','吉高由里子'
   ];
-  mergeStudents(demoS);
-  // 進捗（当月中心）
-  const d=new Date(); const y=d.getFullYear(); const m=d.getMonth()+1;
-  function dd(n){ return String(n).padStart(2,"0"); }
-  const demoP=[
-    {date:`${y}-${dd(m)}-01`,type:"学習",mainRange:"18,23",minRange:"18",result:"18",memo:"スタートは勢いだ！"},
-    {date:`${y}-${dd(m)}-02`,type:"休み",mainRange:"",minRange:"",result:"",memo:"休むのも戦略"},
-    {date:`${y}-${dd(m)}-03`,type:"学習",mainRange:"24,25",minRange:"24",result:"24",memo:"昨日の自分を超えよう"},
-    {date:`${y}-${dd(m)}-04`,type:"復習",mainRange:"18〜25",minRange:"",result:"",memo:"磨く日"},
-    {date:`${y}-${dd(m)}-05`,type:"学習",mainRange:"26,29",minRange:"26",result:"26",memo:"積み上げ"},
-    {date:`${y}-${dd(m)}-06`,type:"テスト",mainRange:"小テスト",minRange:"",result:"80/100",memo:"次は85点"}
-  ];
-  mergeProgress(demoP);
-  renderHome(); renderCalendar(); renderProgress(); renderStudents(); renderWords(); renderRanking();
-  alert("デモデータを追加しました");
-};
+  const FAMOUS_SET = new Set([
+    'ぷろたん','大森元木','米山隆一','ひろゆき',
+    '綾瀬はるか','吉瀬美智子','永野芽郁','石原さとみ','北川景子','有村架純','長澤まさみ','広瀬すず','深田恭子',
+    '吉岡美穂','本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀','多部未華子','戸田恵梨香','広瀬アリス','吉高由里子'
+  ]);
 
-/* 初期化 */
-(function init(){
-  // 今日を進捗入力の既定日に
-  const d=new Date(); const yyyy=d.getFullYear(), mm=String(d.getMonth()+1).padStart(2,"0"), dd=String(d.getDate()).padStart(2,"0");
-  const today=`${yyyy}-${mm}-${dd}`; const el=document.getElementById("pg-date"); if(el && !el.value) el.value=today;
-  setCalToToday();
-  renderHome(); renderCalendar();
+  // キャラ別の“らしい”雰囲気の励まし（創作）。同文回避のためバリエーション多め。
+  const LINES = {
+    '（あなた）': [
+      'としくん、自分で自分を後押し。まず1行、手を動かそう。',
+      '「始める」は最高の才能。今の1分が未来を変えるよ。'
+    ],
+    'ぷろたん': [
+      '最初の1レップが一番重い。1ページやれば体温上がる！',
+      '小さい積み上げが一番強い。今日の“完了”で自信つけよう！',
+      'やらない後悔より、やった疲労。終わったらタンパク質いこう！'
+    ],
+    '大森元木': [
+      '情熱は行動で点火する。まずは手を伸ばせ！',
+      '迷いは燃料。ページを開けば火はつく！',
+      '勝負どころは“今”。1テーマで流れを変えよう！'
+    ],
+    '米山隆一': [
+      '微小な努力の総和が成果。5分の微分から始めよう。',
+      '選択のコストは小さく、継続の価値は大きい。今、着手を。',
+      'データは嘘をつかない。学習時間は必ず収束するよ。'
+    ],
+    'ひろゆき': [
+      'やらないとゼロ。やれば1。ゼロと1の差は大きいですよ。',
+      'まず5分やってみれば？ 意外と続くんで。',
+      '言い訳のコスパ、悪いっす。やる人が結局勝つ。'
+    ],
+    // 成木（強気） / 永田（やさしい）
+    '成木洋平': [
+      'としくん、攻める。1ページで流れを掴め！',
+      '強気でいこう。今の一歩が勢いを作る！',
+      '迷う前に動け。やれば分かる、すぐに。'
+    ],
+    '永田秀仁': [
+      '大丈夫、ゆっくりでいい。1つできれば十分だよ。',
+      '焦らなくていいよ。小さな進歩を一緒に積もう。',
+      '休みたい日は半歩だけ。優しく続けよう。'
+    ],
+    // 先生（日本史風）
+    '唐杉先生': [
+      '「為せば成る」——上杉鷹山の気持ちでいこう。',
+      '坂本龍馬も最初の一歩から。さあ、動こう。',
+      '西郷どんの胆力で。まずは“やってみる”じゃ。'
+    ]
+  };
+
+  // 有名人（女優など）は柔らか/前向き・凛とした系を中心に共通パターンで生成
+  const FEMALE_FAMOUS_GENERIC = [
+    '積み重ねが一番の味方だよ。いまの1ページから始めよう、としくん。',
+    '深呼吸して、ページをひらく。それで十分、流れは来るよ。',
+    '完璧でなくていい。続けた人が、結局いちばん強い。'
+  ];
+
+  // 一般メンバー：心に残る短い励まし（重複回避用に十分な数）
+  const GENERAL_QUOTES = [
+    '千里の道も一歩から。まず5分やってみよう。',
+    '昨日より今日、今日より明日。小さな前進を積もう。',
+    '手を動かせば集中は育つ。始めたら勝ち。',
+    'できることから一つずつ。積み上げは裏切らない。',
+    '完璧より継続。今日は“完了”に変えよう。',
+    '迷ったら開く。ページを開けばエンジンかかる。',
+    '挑戦しなければ何も始まらない。小さく挑もう。',
+    'You can do it! まず1問、手をつけよう。',
+    '止まってもOK、また歩き出せばいい。',
+    '今の一歩が、未来の自分を助けるよ。'
+  ];
+
+  // 人→前回セリフ記録で“同じ発言連続”を避ける
+  const lastLineByName = new Map();
+  function pickLine(name){
+    let arr;
+    if(LINES[name]) arr = LINES[name];
+    else if(FAMOUS_SET.has(name)) arr = FEMALE_FAMOUS_GENERIC;
+    else arr = GENERAL_QUOTES;
+    if(!arr || arr.length===0) arr = ['としくん、今だ。小さく始めよう。'];
+
+    // 直前と同じは避ける
+    let line = arr[Math.floor(Math.random()*arr.length)];
+    const last = lastLineByName.get(name);
+    if(arr.length>1 && line===last){
+      // 別のをもう一度引く
+      line = arr[(Math.floor(Math.random()* (arr.length-1)) + 1) % arr.length];
+    }
+    lastLineByName.set(name, line);
+    // “としくん”呼びを補強
+    if(!/^としくん/.test(line)) line = 'としくん、' + line;
+    return line;
+  }
+
+  function buildClassroom(){
+    const meName=(($('#displayName').value)||'あなた').trim();
+    const desks=$('#desks'); desks.innerHTML='';
+
+    CLASSMATES.forEach((name, idx)=>{
+      const d=document.createElement('div'); d.className='desk';
+      const bubbleId=`bubble-${idx}`;
+      const isYou = (name==='（あなた）');
+      d.innerHTML = `
+        <div class="bubble ${FAMOUS_SET.has(name)?'famous':''}" id="${bubbleId}"></div>
+        <div class="name">${isYou ? meName : name}</div>
+        <div class="role">${isYou ? '（あなた）' : 'クラスメイト'}</div>`;
+      desks.appendChild(d);
+    });
+
+    // しゃべる（完全ランダム：間隔も内容も独立）
+    const allBubbles = CLASSMATES.map((_,i)=>document.getElementById(`bubble-${i}`)).filter(Boolean);
+    function speak(i){
+      const who = CLASSMATES[i];
+      const b = allBubbles[i]; if(!b) return;
+      const isFamous = FAMOUS_SET.has(who);
+      b.classList.toggle('famous', isFamous);
+      b.textContent = pickLine(who);
+      b.classList.add('show');
+
+      // 表示時間：有名=5秒、一般=8秒
+      const showMs = isFamous ? 5000 : 8000;
+      setTimeout(()=>b.classList.remove('show'), showMs);
+
+      // 次発話：4〜9秒ランダム（重なり/同時発話を散らす）
+      const nextMs = 4000 + Math.floor(Math.random()*5000);
+      setTimeout(()=>speak(i), nextMs);
+    }
+    allBubbles.forEach((_,i)=>{
+      setTimeout(()=>speak(i), Math.floor(Math.random()*1200));
+    });
+
+    renderLeaderboard();
+  }
+
+  /* ====== タブ切替 ====== */
+  function showPage(which){
+    const p1=$('#pageProgress'), p2=$('#pageClass');
+    const t1=$('#tabProgress'), t2=$('#tabClass');
+    const is1=(which==='progress');
+    p1.style.display=is1?'block':'none';
+    p2.style.display=is1?'none':'block';
+    t1.classList.toggle('active', is1);
+    t2.classList.toggle('active', !is1);
+    if(is1){
+      renderProgress();
+      setTimeout(scrollTodayIntoView, 60);
+    }else{
+      buildClassroom();
+    }
+  }
+
+  /* ====== イベント ====== */
+  // 名前
+  (function initName(){
+    const saved=localStorage.getItem(NAME_KEY);
+    if(saved) $('#displayName').value=saved;
+  })();
+  $('#saveName').addEventListener('click',()=>{ localStorage.setItem(NAME_KEY, ($('#displayName').value||'あなた').trim()); renderLeaderboard(); });
+
+  // タブ
+  $('#tabProgress').addEventListener('click',()=>showPage('progress'));
+  $('#tabClass').addEventListener('click',()=>showPage('class'));
+
+  // 進捗操作
+  $('#prev').addEventListener('click',()=>{ month-=1; if(month<0){month=11;year-=1;} load(); renderProgress(); setTimeout(scrollTodayIntoView,40); });
+  $('#next').addEventListener('click',()=>{ month+=1; if(month>11){month=0;year+=1;} load(); renderProgress(); setTimeout(scrollTodayIntoView,40); });
+  $('#save').addEventListener('click',save);
+  $('#load').addEventListener('click',()=>{ const ok=load(); renderProgress(); setTimeout(scrollTodayIntoView,40); alert(ok?'読み込みました（端末内データ）':'保存データが見つかりません'); });
+  $('#todayBtn').addEventListener('click',scrollTodayIntoView);
+  $('#toggleCompact').addEventListener('click',()=>{ document.body.classList.toggle('compact'); });
+
+  // 取り込み：貼付
+  $('#importPaste').addEventListener('click',()=>{
+    const text = prompt('日付と種別の一覧を貼り付け（例: 8/13 休日）');
+    if(!text) return;
+    const n = parseTypeImport(text);
+    renderProgress();
+    alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした');
+  });
+
+  // 取り込み：CSV/TSV/TXT
+  $('#importFile').addEventListener('change',async (e)=>{
+    const f=e.target.files?.[0]; if(!f) return;
+    const txt=await f.text();
+    const n=parseTypeImport(txt);
+    renderProgress();
+    alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした');
+    e.target.value='';
+  });
+
+  // 取り込み：画像OCR
+  $('#importImg').addEventListener('change',async (e)=>{
+    const f=e.target.files?.[0]; if(!f) return;
+    try{
+      const text = await ocrImage(f);
+      const n = parseTypeImport(text||'');
+      renderProgress();
+      alert(n?`OCRで読み取り、当月に ${n} 件反映しました`:'文字が認識できないか、反映対象が見つかりませんでした');
+    }catch(err){
+      alert('OCRに失敗しました。画像が鮮明か、照明や傾きも確認してください。');
+    }finally{
+      e.target.value='';
+    }
+  });
+
+  // 初期表示＝進捗、かつ一覧（詰め）を既定ONに
+  load(); renderProgress(); document.body.classList.add('compact');
+  window.addEventListener('load', ()=> setTimeout(scrollTodayIntoView,80));
 })();
 </script>
 </body>
