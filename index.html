@@ -21,6 +21,11 @@
     --bubble-gen-bg:#f4f8ff; --bubble-gen-bd:#d6e6ff;
     --bubble-fam-bg:#fff9ec; --bubble-fam-bd:#ffe5ad;
 
+    /* 球団カラー */
+    --bos-red:#BD3039; --bos-navy:#0D2B56;     /* レッドソックス */
+    --jays-blue:#134A8E; --jays-navy:#1D2D5C;   /* ブルージェイズ */
+    --nl-navy:#0C2340; --nl-red:#BA0C2F;        /* ナ・リーグ系 */
+
     --scale: 1;
   }
   *{box-sizing:border-box}
@@ -58,7 +63,7 @@
   table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
   th,td{padding:calc(8px*var(--scale));border-bottom:1px solid var(--line);vertical-align:top;background:#fff}
   th{
-    text-align:left;font-weight:600;font-size:calc(12px*var(--scale));color:var(--muted);
+    text-align:left;font-weight:600;font-size:calc(12px*var(--scale));color:#334155;
     position:sticky;top:0;z-index:3;background:var(--header-bg);
     border-bottom:2px solid var(--line);box-shadow:var(--header-shadow);backdrop-filter:saturate(1.1);
   }
@@ -68,6 +73,11 @@
   tr.today td{background:var(--today-bg)!important;color:var(--today-text)!important}
   tr.manual-gray td{background:var(--row-gray-bg)!important;color:var(--row-gray-text)!important}
 
+  /* 科目カラー（行） */
+  tr.subj-eng td{background:linear-gradient(90deg, rgba(189,48,57,.08), rgba(13,43,86,.05))} /* 英語=RedSox */
+  tr.subj-math td{background:linear-gradient(90deg, rgba(19,74,142,.08), rgba(29,45,92,.05))}/* 数学=BlueJays */
+  body.theme-nl th{background:linear-gradient(90deg, var(--nl-navy), var(--nl-red)); color:#fff}
+
   .type-wrap{display:flex;align-items:center;gap:8px}
   .type-badge{font-weight:700}
   .type-toggle{
@@ -76,26 +86,36 @@
     font-size:calc(12px*var(--scale));cursor:pointer
   }
 
+  /* 操作列の「完了」 */
+  .btn-done{border:1px solid #9ca3af;background:#f1f5f9;border-radius:10px}
+  .btn-done:hover{background:#e5e7eb}
+
   .fab{
     position:fixed;z-index:5;width:54px;height:54px;border-radius:50%;
     display:flex;align-items:center;justify-content:center;border:1px solid var(--line);background:#fff;
-    box-shadow:0 10px 20px rgba(0,0,0,.12);user-select:none;-webkit-user-select:none;
+    box-shadow:0 10px 20px rgba(0,0,0,.12);
     right:14px;bottom:14px
   }
-  .fab:hover{transform:translateY(-1px)} .fab:active{transform:translateY(0)}
   .fab span{font-size:22px;line-height:1}
 
   .blackboard{border-radius:10px;border:2px solid #2f4f4f;background:#0f3b3f;color:#e0f2f1;padding:10px 12px;font-weight:600;margin-bottom:10px}
-  .room{border:1px solid var(--line);border-radius:12px;padding:14px;background:#f7fafc;max-height:80vh;overflow:auto}
-  .desks{display:grid;gap:12px;grid-template-columns:repeat(3, minmax(0,1fr))}
-  .desk{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;min-height:110px;display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden}
+
+  /* 教室 */
+  .room{border:1px solid var(--line);border-radius:12px;padding:10px;background:#f7fafc;max-height:80vh;overflow:auto}
+  .desks{display:grid;gap:10px;grid-template-columns:repeat(4, minmax(0,1fr))}
+  .desk{
+    background:linear-gradient(#f6ead6, #e2cfa6);
+    border:1px solid #b08b57;border-radius:12px;padding:8px;min-height:96px;
+    display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.6), 0 2px 6px rgba(0,0,0,.04)
+  }
   .desk .name{font-weight:700}
   .desk .role{font-size:12px;color:#6b7280}
   .desk.male .name{color:var(--male)}
   .desk.female .name{color:var(--female)}
 
   .bubble{
-    position:absolute;left:8px;right:8px;top:8px;
+    position:absolute;left:8px;right:8px;top:8px;z-index:1;
     border:1px solid var(--bubble-gen-bd);background:var(--bubble-gen-bg);
     border-radius:12px;padding:8px 10px;font-size:14px;box-shadow:0 6px 12px rgba(0,0,0,.06);
     display:none;max-width:unset;white-space:pre-line
@@ -105,6 +125,11 @@
   .bubble.famous{background:var(--bubble-fam-bg);border-color:var(--bubble-fam-bd)}
   .bubble.famous::after{border-top-color:var(--bubble-fam-bd)}
   .bubble.famous::before{border-top-color:var(--bubble-fam-bg)}
+  .bubble.shout{
+    font-size:28px; padding:14px 16px; z-index:2;
+    box-shadow:0 14px 30px rgba(0,0,0,.18);
+    left:4px; right:4px;
+  }
   .bubble.show{display:block;animation:fadeIn .15s ease}
   @keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 
@@ -122,21 +147,25 @@
   .card h4{margin:0 0 6px}
   .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 
-  /* Timetable (hover open) */
+  /* 時間割（クリックで小窓表示） */
   .tt{margin-left:auto; position:relative}
-  .tt .pill{cursor:default}
+  .tt .pill{cursor:pointer}
   .tt-panel{
     position:absolute; right:0; top:42px; width:min(92vw,720px); max-height:70vh; overflow:auto;
     border:1px solid var(--line); border-radius:12px; background:#fff; box-shadow:0 20px 40px rgba(0,0,0,.12);
     opacity:0; transform:translateY(-6px) scale(.98); pointer-events:none; transition:opacity .18s ease, transform .18s ease;
-    padding:10px;
+    padding:10px; z-index:5;
   }
-  .tt:hover .tt-panel{opacity:1; transform:translateY(0) scale(1); pointer-events:auto}
+  .tt.open .tt-panel{opacity:1; transform:translateY(0) scale(1); pointer-events:auto}
   .tt-grid{display:grid;grid-template-columns:110px 1fr 1fr 1fr; gap:8px; align-items:center}
   .tt-grid > div{padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:#fff}
   .tt-row{display:contents}
   .tt-actions{display:flex;gap:8px;align-items:center;margin:8px 0}
   .linklike{color:var(--accent);text-decoration:underline;cursor:pointer}
+
+  /* 大きめ “一覧” ボタン */
+  .btn-big{padding:10px 16px;border-radius:999px;border:1px solid var(--line);background:#fff;font-weight:700}
+  .btn-big.active{background:linear-gradient(90deg, var(--nl-navy), var(--nl-red));color:#fff;border-color:transparent}
 </style>
 </head>
 <body>
@@ -171,23 +200,25 @@
       <button id="wipeP">全削除</button>
     </div>
 
-    <!-- 科目切替 + 全科目（一覧） + 時間割ホバー -->
+    <!-- 科目切替 + 全科目（一覧） + 時間割 -->
     <div class="topbar" style="gap:12px; align-items:center">
       <div class="row" style="gap:8px">
         <label class="muted">科目：</label>
         <select id="subjectSelect"></select>
         <button id="addSubject">＋科目追加</button>
-        <label class="muted"><input id="toggleAll" type="checkbox"> 全科目（一覧表示）</label>
+        <button id="btnToggleAll" class="btn-big">⭐ 全科目（一覧）</button>
+        <label class="muted" style="display:none"><input id="toggleAll" type="checkbox"> 全科目（一覧表示）</label>
       </div>
 
-      <div class="tt">
-        <span class="pill">🗓 時間割（ホバーで開く）</span>
+      <div class="tt" id="ttBox">
+        <span class="pill" id="ttOpenBtn">🗓 時間割（開く）</span>
         <div class="tt-panel">
           <div class="row tt-actions">
             <strong id="ttTitle">今日の時間割</strong>
             <button id="ttAddRow">＋行追加</button>
             <button id="ttShuffle">🔀 自動提案</button>
             <span class="muted">科目ごとに保存</span>
+            <span style="margin-left:auto" class="linklike" id="ttClose">× 閉じる</span>
           </div>
           <div class="tt-grid">
             <div class="muted">開始</div>
@@ -196,7 +227,7 @@
             <div class="muted">操作</div>
           </div>
           <div id="ttRows"></div>
-          <div class="muted" style="margin-top:8px">ヒント：ドラッグで時刻を選んで入力 → オートセーブ</div>
+          <div class="muted" style="margin-top:8px">ヒント：入力はオートセーブ／自動提案しても小窓は閉じません</div>
         </div>
       </div>
     </div>
@@ -207,7 +238,7 @@
       <button id="next" class="primary">次月 ▶</button>
       <button id="save">💾 更新/保存</button>
       <button id="load">📥 読込</button>
-      <button id="toggleCompact">🗂 一覧表示</button>
+      <button id="toggleCompact">🗂 一覧表示（行を詰める）</button>
     </div>
 
     <div class="topbar">
@@ -229,12 +260,7 @@
       <table>
         <thead>
           <tr id="theadRow">
-            <th class="medium">日付</th>
-            <th class="small padL">種別</th>
-            <th class="medium padL">目標（科目名）</th>
-            <th class="medium padL">結果</th>
-            <th class="medium padL">復習</th>
-            <th class="small padL">色</th>
+            <!-- JSで生成 -->
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -244,7 +270,7 @@
 
   <!-- ===== Page 2: クラスメート ===== -->
   <section id="pageClass" style="display:none">
-    <div class="ops">
+    <div class="ops" style="justify-content:flex-start">
       <button id="undoC">戻る</button>
       <button id="redoC">進む</button>
       <button id="wipeC">全削除</button>
@@ -280,8 +306,7 @@
   <!-- ===== Page 4: セリフ編集 ===== -->
   <section id="pageEdit" style="display:none">
     <div class="ops">
-      <span class="muted">各人：1行=1セリフ。空欄にするとミュート（発言しない）</span>
-      <span class="muted">自動保存：入力停止0.6秒で保存</span>
+      <span class="muted">各人：1行=1セリフ。空欄でミュート（発言しない）／0.6秒で自動保存</span>
       <button id="exportLines">💾 書き出し</button>
       <label>
         <input id="importLinesFile" type="file" accept=".json" style="display:none">
@@ -303,14 +328,15 @@
   const BOOST_KEY='studyplanner.v15.classBoost';
   const SUBJ_KEY='studyplanner.v15.subjects';
   const TT_KEY='studyplanner.v15.tt'; // 時間割
+  const LAST_VIEW_KEY='studyplanner.v15.lastView'; // showAll保持
 
   let year=(new Date()).getFullYear(), month=(new Date()).getMonth();
-  let rows=[]; // 現在のUIで編集中の配列（科目または全科目）
+  let rows=[];
   let subjects = loadSubjects();
-  let subject = subjects[0] || '世界史'; // 現在選択中の科目
-  let showAll = false; // 全科目（一覧）
+  let subject = subjects[0] || '世界史';
+  let showAll = loadLastView(); // 全科目（一覧）
 
-  // ======= Auto Save (Page1) =======
+  /* ======= Auto Save (Page1) ======= */
   const AUTOSAVE_MS = 800;
   let autoSaveTimer = null;
   const currentKey = (s=subject)=> `${KEY}:${s}:${year}-${String(month+1).padStart(2,'0')}`;
@@ -321,8 +347,11 @@
     });
     try{ localStorage.setItem(currentKey(s), JSON.stringify(data)); }catch(_){}
   }
-  function touch(){ if(autoSaveTimer) clearTimeout(autoSaveTimer); autoSaveTimer=setTimeout(()=>{ if(showAll){ // 全科目は科目別に分割保存
-        const map = new Map(); // subj -> rows[]
+  function touch(){
+    if(autoSaveTimer) clearTimeout(autoSaveTimer);
+    autoSaveTimer=setTimeout(()=>{
+      if(showAll){
+        const map = new Map();
         rows.forEach(r=>{
           const subj = r._subject || subject;
           if(!map.has(subj)) map.set(subj,[]);
@@ -332,9 +361,12 @@
       }else{
         doSaveToLocal(subject, rows);
       }
-      autoSaveTimer=null; }, AUTOSAVE_MS);
+      autoSaveTimer=null;
+    }, AUTOSAVE_MS);
   }
-  function flushAutoSave(){ if(autoSaveTimer){ clearTimeout(autoSaveTimer); autoSaveTimer=null; } if(showAll){
+  function flushAutoSave(){
+    if(autoSaveTimer){ clearTimeout(autoSaveTimer); autoSaveTimer=null; }
+    if(showAll){
       const map = new Map();
       rows.forEach(r=>{
         const subj = r._subject || subject;
@@ -348,14 +380,14 @@
   }
   window.addEventListener('beforeunload', flushAutoSave);
 
-  /* ========== Undo/Redo ========== */
+  /* ===== Undo/Redo ===== */
   const history = { past:[], future:[] };
   const snapshot = () => JSON.parse(JSON.stringify({year,month,rows,subject,showAll}));
   const pushHistory = () => { history.past.push(snapshot()); history.future.length=0; };
   function undo(){ if(!history.past.length) return; const cur=snapshot(); const prev=history.past.pop(); history.future.push(cur); ({year,month,rows,subject,showAll}=prev); renderAll(); }
   function redo(){ if(!history.future.length) return; const cur=snapshot(); const nxt=history.future.pop(); history.past.push(cur); ({year,month,rows,subject,showAll}=nxt); renderAll(); }
 
-  /* ========== 小ユーティリティ ========== */
+  /* ===== Utils ===== */
   const $=sel=>document.querySelector(sel);
   const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   const fromYmd=s=>{const [y,m,d]=s.split('-').map(Number); return new Date(y, m-1, d);};
@@ -371,16 +403,18 @@
   function persist(rec){const i=rows.findIndex(x=>x.date===rec.date && (showAll? (x._subject===rec._subject):true)); if(i>=0) rows[i]=rec; else rows.push(rec);}
   function stripSubject(r){ const { _subject, ...rest } = r; return rest; }
 
-  /* ========== 科目の保存/読込 ========== */
+  /* ===== 科目保存/読込 ===== */
   function loadSubjects(){
     try{
       const raw=localStorage.getItem(SUBJ_KEY);
       let arr = raw? JSON.parse(raw): null;
-      if(!Array.isArray(arr) || arr.length===0) arr=['世界史','英語'];
+      if(!Array.isArray(arr) || arr.length===0) arr=['世界史','英語','数学'];
       return arr;
-    }catch(_){ return ['世界史','英語']; }
+    }catch(_){ return ['世界史','英語','数学']; }
   }
   function saveSubjects(){ try{ localStorage.setItem(SUBJ_KEY, JSON.stringify(subjects)); }catch(_){} }
+  function loadLastView(){ try{ return localStorage.getItem(LAST_VIEW_KEY)==='1'; }catch(_){ return false; } }
+  function saveLastView(v){ try{ localStorage.setItem(LAST_VIEW_KEY, v?'1':'0'); }catch(_){} }
   function renderSubjectSelect(){
     const sel = $('#subjectSelect'); sel.innerHTML='';
     subjects.forEach(s=>{
@@ -390,20 +424,17 @@
     sel.value=subject;
   }
 
-  /* ========== Page1: 保存/読込 ========== */
+  /* ===== Page1 保存/読込 ===== */
   function save(){ pushHistory(); flushAutoSave(); alert('更新しました（この端末のブラウザ内）'); renderRank(); scrollTodayIntoView(); }
   function loadSubjectMonth(s=subject){
     const raw=localStorage.getItem(currentKey(s));
     let arr=[];
-    if(raw){
-      try{ arr = JSON.parse(raw)||[]; }catch(_){}
-    }
+    if(raw){ try{ arr = JSON.parse(raw)||[]; }catch(_){ } }
     ensureScaffoldFor(arr);
     return arr;
   }
   function load(){
     if(showAll){
-      // 全科目の結合ビュー
       const merged=[];
       subjects.forEach(sub=>{
         const arr = loadSubjectMonth(sub);
@@ -417,13 +448,8 @@
     }
   }
 
-  /* ========== Page1: 進捗レンダリング ========== */
-  function renderProgress(){
-    load(); // subject or all を反映
-    const days = monthDates(year,month).length;
-    $('#label').textContent = showAll? `全科目 ${year}年${month+1}月（${days}日）` : `${subject} — ${year}年${month+1}月（${days}日）`;
-
-    // ヘッダー（全科目なら“科目”列を先頭に追加）
+  /* ===== ヘッダー生成 ===== */
+  function renderHead(){
     const thead = $('#theadRow'); thead.innerHTML='';
     if(showAll){
       thead.innerHTML = `
@@ -433,7 +459,8 @@
         <th class="medium padL">目標（科目名）</th>
         <th class="medium padL">結果</th>
         <th class="medium padL">復習</th>
-        <th class="small padL">色</th>`;
+        <th class="small padL">色</th>
+        <th class="small">操作</th>`;
     }else{
       thead.innerHTML = `
         <th class="medium">日付</th>
@@ -441,13 +468,30 @@
         <th class="medium padL">目標（科目名）</th>
         <th class="medium padL">結果</th>
         <th class="medium padL">復習</th>
-        <th class="small padL">色</th>`;
+        <th class="small padL">色</th>
+        <th class="small">操作</th>`;
     }
+  }
+
+  /* ===== Page1: 進捗描画 ===== */
+  function rowThemeClass(subj){
+    if(!subj) return '';
+    if(subj==='英語') return 'subj-eng';
+    if(subj==='数学') return 'subj-math';
+    return '';
+  }
+  function renderProgress(){
+    load();
+    const days = monthDates(year,month).length;
+    $('#label').textContent = showAll? `全科目 ${year}年${month+1}月（${days}日）` : `${subject} — ${year}年${month+1}月（${days}日）`;
+    document.body.classList.toggle('theme-nl', showAll);
+
+    renderHead();
 
     const tb=$('#tbody'); tb.innerHTML='';
     const todayStr=ymd(new Date());
 
-    // 全科目ビューなら “各日×各科目” を全て出す（行数は増えるが把握しやすい）
+    // ビュー用リスト
     let list=[];
     if(showAll){
       const needDays=monthDates(year,month);
@@ -464,15 +508,19 @@
 
     list.forEach(r=>{
       const tr=document.createElement('tr');
+      const subj = r._subject || subject;
+      const themeClass = rowThemeClass(subj);
+      if(themeClass) tr.classList.add(themeClass);
+
       if(r.color==='gray') tr.classList.add('manual-gray');
       else if(r.date===todayStr) tr.classList.add('today');
 
       if(showAll){
-        const tdSub=document.createElement('td'); tdSub.className='small'; tdSub.textContent=r._subject||subject;
-        tr.appendChild(tdSub);
+        const tdSub=document.createElement('td'); tdSub.className='small'; tdSub.textContent=subj; tr.appendChild(tdSub);
       }
 
       const tdDate=document.createElement('td'); tdDate.className='medium'; tdDate.textContent=jpDateLabel(r.date);
+
       const tdType=document.createElement('td'); tdType.className='small padL';
       const wrap=document.createElement('div'); wrap.className='type-wrap';
       const badge=document.createElement('span'); badge.className='type-badge'; badge.textContent=(r.type==='休日')?'休日':(r.type==='復習'?'復習':'学習');
@@ -506,15 +554,28 @@
       selClr.addEventListener('change',e=>{ pushHistory(); r.color=e.target.value; persist(r); touch(); renderProgress(); renderRank(); });
       tdClr.appendChild(selClr);
 
+      /* 右端：完了ボタン（行の移動なし・色だけ付ける／今日の行に軽く合わせ） */
+      const tdOps=document.createElement('td'); tdOps.className='small';
+      const btnDone=document.createElement('button'); btnDone.className='btn-done'; btnDone.textContent='完了';
+      btnDone.addEventListener('click',()=>{
+        pushHistory();
+        r.color='gray';
+        persist(r); touch(); renderProgress(); renderRank();
+        setTimeout(scrollTodayIntoView,0);
+      });
+      tdOps.appendChild(btnDone);
+
       tr.appendChild(tdDate); tr.appendChild(tdType); tr.appendChild(tdGoal);
-      tr.appendChild(tdRes); tr.appendChild(tdRev); tr.appendChild(tdClr);
+      tr.appendChild(tdRes); tr.appendChild(tdRev); tr.appendChild(tdClr); tr.appendChild(tdOps);
       tb.appendChild(tr);
     });
 
     const t=new Date();
     $('#todayBanner').textContent=`本日: ${t.getMonth()+1}月${t.getDate()}日(${jpWeek(t)})`;
     scrollTodayIntoView();
-    renderTimetable(); // 科目に応じて
+    renderTimetable();
+    // 一覧ボタンの見た目
+    $('#btnToggleAll').classList.toggle('active', showAll);
   }
 
   function scrollTodayIntoView(){
@@ -527,25 +588,19 @@
     scroller.scrollTo({top:Math.max(0,rowTop-headerH-4), behavior:'instant'});
   }
 
-  /* ========== 取り込み：貼付 / CSV/TSV / OCR ========== */
+  /* ===== 取り込み ===== */
   function normalizeDateToken(raw){
     if(!raw) return null;
     let s = String(raw).trim();
-    s = s.replace(/（.*?）|\(.*?\)/g,'');  // 曜日などの括弧を除去
-    s = s.replace(/[．。・‒–—―〜～]/g,'-'); // 似た記号を正規化
+    s = s.replace(/（.*?）|\(.*?\)/g,'');
+    s = s.replace(/[．。・‒–—―〜～]/g,'-');
     let m = s.match(/^(\d{4})\s*[-/]\s*(\d{1,2})\s*[-/]\s*(\d{1,2})$/);
     if(m){ return {y:+m[1], mo:+m[2]-1, d:+m[3]}; }
     m = s.match(/^(\d{1,2})\s*(?:\/|月)\s*(\d{1,2})/);
     if(m){ const y = year; return {y, mo:+m[1]-1, d:+m[2]}; }
     return null;
   }
-  function clean(v){
-    const s = String(v ?? '').trim();
-    if(!s) return '';
-    if(/^(nan|null|undefined)$/i.test(s)) return '';
-    return s;
-  }
-
+  function clean(v){ const s = String(v ?? '').trim(); if(!s) return ''; if(/^(nan|null|undefined)$/i.test(s)) return ''; return s; }
   function parseDelimited(text){
     if(text.charCodeAt(0)===0xFEFF) text = text.slice(1);
     const sep = (text.indexOf('\t')!==-1) ? '\t' : ',';
@@ -570,10 +625,7 @@
       if(typ==='休み') typ='休日';
       if(!/^(学習|休日|復習)$/.test(typ)) continue;
       if(dtk.y!==year || dtk.mo!==month) continue;
-
-      // 全科目ビューでは貼り付け不可（どの科目か特定できない）
-      if(showAll){ alert('全科目（一覧）では貼り付け取込はできません。科目を選択してから実行してください。'); return 0; }
-
+      if(showAll){ alert('全科目（一覧）では貼付取込は不可です。科目を選んでください。'); return 0; }
       const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
       const rec = rows.find(x=>x.date===ds);
       if(rec){ pushHistory(); rec.type=typ; persist(rec); applied++; }
@@ -593,7 +645,7 @@
       if(/復習/.test(h)) col.review=h;
     });
     if(!col.date || !col.type){ alert('CSV見出しを確認してください（少なくとも「日付」「種別」）'); return 0; }
-    if(showAll){ alert('全科目（一覧）ではCSV取込はできません。科目を選択してから実行してください。'); return 0; }
+    if(showAll){ alert('全科目（一覧）ではCSV取込は不可です。科目を選んでください。'); return 0; }
 
     let applied=0;
     for(const o of objs){
@@ -606,7 +658,6 @@
       let t = clean(o[col.type]);
       if(t==='休み') t='休日';
       if(/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; }
-
       if(col.goal   !== undefined) rec.goal   = clean(o[col.goal]);
       if(col.result !== undefined) rec.result = clean(o[col.result]);
       if(col.review !== undefined) rec.review = clean(o[col.review]);
@@ -631,7 +682,6 @@
     const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
     const i = L.findIndex(s => s.includes('日付'));
     const data = L.slice(i+5);
-
     const rows = [];
     let block = {};
     let ptr = 0;
@@ -657,7 +707,7 @@
       if (n>0){ touch(); return n; }
     }catch(_){}
     if (looksLikeColumnBlocks(text)){
-      if(showAll){ alert('全科目（一覧）では取込できません。科目を選択してから実行してください。'); return 0; }
+      if(showAll){ alert('全科目（一覧）では取込できません。科目を選んでください。'); return 0; }
       const parsed = parseColumnBlocks(text);
       let applied=0;
       const col = {date:'日付', type:'種別', goal:'目標', result:'結果', review:'復習'};
@@ -670,11 +720,9 @@
         let t = clean(o[col.type]);
         if (t==='休み') t='休日';
         if (/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; }
-
         rec.goal   = clean(o[col.goal]);
         rec.result = clean(o[col.result]);
         rec.review = clean(o[col.review]);
-
         persist(rec); applied++;
       }
       if(applied) touch();
@@ -701,10 +749,9 @@
     }
   }
 
-  /* ========== Page3: ランキング ========== */
+  /* ===== Page3: ランキング ===== */
   function myMonthlyPoints(){
     let total=0;
-    // 全科目は現在科目でカウント（※必要なら全科目合算に変更可）
     const base = loadSubjectMonth(subject);
     monthDates(year,month).forEach(date=>{
       const r=base.find(x=>x.date===date); if(!r) return;
@@ -747,448 +794,9 @@
     }
   }
 
-  /* ========== Page2: クラスメート（吹き出し） ========== */
+  /* ===== Page2: クラスメート ===== */
   const CLASSMATES = [
     '橋本淑雅','望月亜希子',
     '永田秀仁','高橋','嶋康','田中','池之内英明','加藤','佐々木','富田雄二','富島雅人','成木洋平','唐杉先生',
     'ぷろたん','大森元木','橋本範之','米山隆一','ひろゆき',
-    '綾瀬はるか','永野芽郁','石原さとみ','北川景色','有村架純','長澤まさみ','広瀬すず','深田恭子',
-    '本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀',
-    '多部未華子','戸田恵梨香','広瀬アリス','吉高由里子'
-  ];
-  const FEMALES = new Set(['望月亜希子','綾瀬はるか','永野芽郁','石原さとみ','北川景色','有村架純','長澤まさみ','広瀬すず','深田恭子','本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀','多部未華子','戸田恵梨香','広瀬アリス','吉高由里子']);
-  const FAMOUS_SET = new Set([
-    'ぷろたん','大森元木','米山隆一','ひろゆき',
-    '綾瀬はるか','永野芽郁','石原さとみ','北川景色','有村架純','長澤まさみ','広瀬すず','深田恭子',
-    '本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀','多部未華子','戸田恵梨香','広瀬アリス','吉高由里子',
-    '望月亜希子'
-  ]);
-
-  const BASE_GENERAL = [
-    '今日も一歩ずつ！','その調子！','休憩も忘れずに','昨日の復習いこ！',
-    '目標メモした？','終わったら＋10ptだ！','分からない所は付箋！',
-    '焦らず丁寧に！','5分だけでも手を動かそう','間違いは伸びしろだ！'
-  ];
-  const defaultLines = {}; CLASSMATES.forEach(n=>{ defaultLines[n] = []; });
-
-  let customLines = loadCustomLines();
-  function loadCustomLines(){ try{ const raw=localStorage.getItem(LINES_KEY); return raw? JSON.parse(raw): {}; }catch(_){ return {}; } }
-  let lineAutosaveTimer=null;
-  function scheduleLinesSave(){ if(lineAutosaveTimer) clearTimeout(lineAutosaveTimer); lineAutosaveTimer = setTimeout(()=>{ saveCustomLines(); }, 600); }
-  function saveCustomLines(){ try{ localStorage.setItem(LINES_KEY, JSON.stringify(customLines)); }catch(_){} }
-
-  function getLinesFor(name){
-    if(Object.prototype.hasOwnProperty.call(customLines, name)){
-      const arr = Array.isArray(customLines[name]) ? customLines[name] : [];
-      return arr;
-    }
-    const base = (defaultLines[name] && defaultLines[name].length ? defaultLines[name] : BASE_GENERAL);
-    return base.slice();
-  }
-
-  const recentLines = [];
-  function lineFor(name){
-    const pool = getLinesFor(name);
-    if(!pool.length) return null;
-    let msg = pool[Math.floor(Math.random()*pool.length)];
-    let guard = 0;
-    while(recentLines.includes(msg) && guard++<6){
-      msg = pool[Math.floor(Math.random()*pool.length)];
-    }
-    recentLines.push(msg);
-    if(recentLines.length>12) recentLines.shift();
-    return msg;
-  }
-
-  // 速さ調整
-  function factorFromBoost(boostPct){ const k = Math.max(0, Number(boostPct)||0); return 1 / (1 + k/100); }
-  function getBoost(){ const v = Number($('#boostInput').value)||0; return Math.max(0, v); }
-
-  // 複数人同時発言
-  let classTicker = null;
-  const lastSpokenAt = new Map();
-  function visibleDurationMs(){ return Math.round(3000 * factorFromBoost(getBoost())); }
-  function cooldownMs(){ return Math.max(800, Math.round(visibleDurationMs()*0.9)); }
-  function baseTickMs(){ return Math.max(200, Math.round(1200 * factorFromBoost(getBoost()))); }
-  function randomEmissionCount(){ const r=Math.random(); if(r<0.20) return 0; if(r<0.60) return 1; if(r<0.90) return 2; if(r<0.98) return 3; return 4; }
-
-  function showBubble(deskEl, name){
-    const bubble = deskEl.querySelector('.bubble'); if(!bubble) return;
-    const msg = lineFor(name); if(msg === null){ bubble.classList.remove('show'); return; }
-    const isFamous = FAMOUS_SET.has(name);
-    bubble.className = 'bubble' + (isFamous ? ' famous' : '');
-    bubble.textContent = msg;
-    bubble.classList.add('show');
-    const vms = visibleDurationMs();
-    setTimeout(()=> bubble.classList.remove('show'), vms);
-    lastSpokenAt.set(name, Date.now());
-  }
-
-  function arrangeNamesMFM(){
-    const males = CLASSMATES.filter(n=>!FEMALES.has(n));
-    const females = CLASSMATES.filter(n=>FEMALES.has(n));
-    const half = Math.ceil(males.length/2);
-    const col1 = males.slice(0, half);
-    const col3 = males.slice(half);
-    const col2 = females;
-    const rows = Math.max(col1.length, col2.length, col3.length);
-    const arranged = [];
-    for(let i=0;i<rows;i++){
-      if(col1[i]) arranged.push(col1[i]);
-      if(col2[i]) arranged.push(col2[i]);
-      if(col3[i]) arranged.push(col3[i]);
-    }
-    return arranged;
-  }
-
-  function buildClassroom(){
-    const desks=$('#desks'); if(!desks) return; desks.innerHTML='';
-    const names = arrangeNamesMFM();
-    names.forEach((name)=>{
-      const d=document.createElement('div'); d.className='desk';
-      d.classList.add(FEMALES.has(name)?'female':'male');
-      d.innerHTML = `
-        <div class="name">${name}</div>
-        <div class="role">${name==='橋本淑雅'?'（あなた）':'クラスメイト'}</div>
-        <div class="bubble"></div>
-      `;
-      d.addEventListener('click',()=> showBubble(d, name));
-      desks.appendChild(d);
-    });
-  }
-
-  function tickOnce(){
-    const desks = Array.from(document.querySelectorAll('#desks .desk'));
-    if(desks.length===0) return;
-    const now = Date.now();
-    const count = randomEmissionCount();
-    const candidates = desks
-      .map(el=>({el, name: el.querySelector('.name')?.textContent || ''}))
-      .filter(x=>x.name && (!lastSpokenAt.has(x.name) || (now - (lastSpokenAt.get(x.name)||0) > cooldownMs())))
-      .filter(x=> (getLinesFor(x.name).length>0));
-
-    if(candidates.length===0) return;
-
-    for(let i=0; i<count && candidates.length>0; i++){
-      const idx = Math.floor(Math.random()*candidates.length);
-      const pick = candidates.splice(idx,1)[0];
-      showBubble(pick.el, pick.name);
-    }
-  }
-
-  function startClassTicker(){ stopClassTicker(); classTicker = setInterval(tickOnce, baseTickMs()); }
-  function stopClassTicker(){ if(classTicker){ clearInterval(classTicker); classTicker=null; } }
-  function restartClassTicker(){ stopClassTicker(); startClassTicker(); }
-
-  /* ========== Page4: セリフ編集UI ========== */
-  function renderEditPage(){
-    const grid = $('#editGrid'); if(!grid) return;
-    grid.innerHTML='';
-    CLASSMATES.forEach(name=>{
-      const card = document.createElement('div');
-      card.className='card';
-      const id = 'ta_'+btoa(unescape(encodeURIComponent(name))).replace(/=+/g,'');
-      const lines = getLinesFor(name);
-      const text = (Object.prototype.hasOwnProperty.call(customLines, name) ? customLines[name] : lines).join('\n');
-      card.innerHTML = `
-        <h4>${name}</h4>
-        <textarea id="${id}" placeholder="1行=1セリフ。空にするとミュート">${escapeHtml(text)}</textarea>
-        <div class="row">
-          <button data-name="${name}" class="btnClear">ミュート（空にする）</button>
-          <span class="muted">現在 ${lines.length} 件</span>
-        </div>
-      `;
-      grid.appendChild(card);
-      const ta = card.querySelector('textarea');
-      ta.addEventListener('input',()=>{
-        const v = String(ta.value||'');
-        const arr = v.split('\n').map(s=>s.trim()).filter(s=>s.length>0);
-        customLines[name] = arr;
-        scheduleLinesSave();
-      });
-      card.querySelector('.btnClear').addEventListener('click',()=>{
-        customLines[name] = [];
-        const ta2 = card.querySelector('textarea'); ta2.value='';
-        scheduleLinesSave();
-      });
-    });
-  }
-  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-  $('#exportLines').addEventListener('click',()=>{
-    const blob = new Blob([JSON.stringify(customLines, null, 2)], {type:'application/json'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'class_lines.json';
-    a.click();
-    URL.revokeObjectURL(a.href);
-  });
-  $('#importLinesFile').addEventListener('change',async(e)=>{
-    const f=e.target.files?.[0]; if(!f) return;
-    try{
-      const txt=await f.text();
-      const obj=JSON.parse(txt);
-      if(obj && typeof obj==='object'){ customLines = obj; saveCustomLines(); renderEditPage(); }
-    }catch(_){ alert('JSONの読み込みに失敗しました'); }
-    e.target.value='';
-  });
-
-  /* ====== 科目UI ====== */
-  function setShowAll(v){ showAll=!!v; $('#toggleAll').checked = showAll; renderProgress(); }
-  $('#toggleAll').addEventListener('change', e=>{ pushHistory(); setShowAll(e.target.checked); });
-  $('#addSubject').addEventListener('click',()=>{
-    const name = prompt('追加する科目名（例：英語）'); if(!name) return;
-    const trimmed = name.trim();
-    if(!trimmed) return;
-    if(subjects.includes(trimmed)){ alert('その科目はすでにあります'); return; }
-    subjects.push(trimmed); saveSubjects(); renderSubjectSelect();
-    subject = trimmed; setShowAll(false); renderProgress();
-  });
-  $('#subjectSelect').addEventListener('change', e=>{ pushHistory(); subject = e.target.value; setShowAll(false); renderProgress(); });
-
-  /* ====== 時間割（科目ごと保存） ====== */
-  function ttKey(s=subject){ return `${TT_KEY}:${s}`; }
-  function loadTT(s=subject){
-    try{ const raw=localStorage.getItem(ttKey(s)); return raw? JSON.parse(raw): []; }catch(_){ return []; }
-  }
-  function saveTT(s=subject, data){ try{ localStorage.setItem(ttKey(s), JSON.stringify(data)); }catch(_){} }
-  function renderTimetable(){
-    const title = $('#ttTitle'); title.textContent = showAll? '（全科目モード：表示のみ）今日の時間割' : `${subject} の今日の時間割`;
-    const rowsEl = $('#ttRows'); rowsEl.innerHTML='';
-    const data = loadTT(subject);
-    data.forEach((item,idx)=>{
-      const row = document.createElement('div'); row.className='tt-row';
-      row.innerHTML = `
-        <div><input type="time" value="${item.start||''}"></div>
-        <div><input type="time" value="${item.end||''}"></div>
-        <div><input type="text" placeholder="何をする？" value="${escapeHtml(item.title||'')}"></div>
-        <div>
-          <span class="linklike" data-act="up">↑</span>
-          <span class="linklike" data-act="down" style="margin-left:8px">↓</span>
-          <span class="linklike" data-act="del" style="margin-left:8px">削除</span>
-        </div>`;
-      const inputs = row.querySelectorAll('input');
-      inputs[0].addEventListener('input',()=>{ item.start = inputs[0].value; saveTT(subject, data); });
-      inputs[1].addEventListener('input',()=>{ item.end   = inputs[1].value; saveTT(subject, data); });
-      inputs[2].addEventListener('input',()=>{ item.title = inputs[2].value; saveTT(subject, data); });
-      row.querySelector('[data-act="del"]').addEventListener('click',()=>{ data.splice(idx,1); saveTT(subject, data); renderTimetable(); });
-      row.querySelector('[data-act="up"]').addEventListener('click',()=>{ if(idx>0){ const t=data[idx-1]; data[idx-1]=data[idx]; data[idx]=t; saveTT(subject, data); renderTimetable(); }});
-      row.querySelector('[data-act="down"]').addEventListener('click',()=>{ if(idx<data.length-1){ const t=data[idx+1]; data[idx+1]=data[idx]; data[idx]=t; saveTT(subject, data); renderTimetable(); }});
-      $('#ttRows').appendChild(row);
-    });
-    // 全科目モードでは編集をロック
-    $('#ttAddRow').disabled = showAll;
-    $('#ttShuffle').disabled = showAll;
-  }
-  $('#ttAddRow').addEventListener('click',()=>{
-    const data = loadTT(subject);
-    data.push({start:'', end:'', title:''});
-    saveTT(subject, data); renderTimetable();
-  });
-  $('#ttShuffle').addEventListener('click',()=>{
-    // ルールベースの簡易自動割当：本日（当月&今日以降）から未完了の goal/review を拾って時間枠に入れる
-    const data = loadTT(subject);
-    if(data.length===0){ alert('先に時間枠（開始/終了）を作ってください'); return; }
-    const today = new Date();
-    const todayYmd = ymd(today);
-    const base = loadSubjectMonth(subject);
-    const todo = [];
-    base.forEach(r=>{
-      if(r.date>=todayYmd && r.color!=='gray'){ // 未完了
-        if(r.goal) todo.push(r.goal);
-        if(r.review) todo.push('復習: '+r.review);
-      }
-    });
-    if(todo.length===0){ todo.push('予習/復習タイム'); }
-    const newData = data.map((slot,i)=>({ ...slot, title: todo[i%todo.length] }));
-    saveTT(subject, newData); renderTimetable();
-  });
-
-  /* ====== イベント ====== */
-  (function initName(){
-    const saved=localStorage.getItem(NAME_KEY);
-    const me = saved || '橋本淑雅';
-    $('#displayName').value = me;
-    $('#meOnBoard').textContent = me;
-  })();
-  $('#saveName').addEventListener('click',()=>{
-    const me = ($('#displayName').value||'橋本淑雅').trim();
-    localStorage.setItem(NAME_KEY, me);
-    $('#meOnBoard').textContent = me;
-    renderRank();
-  });
-
-  // タブ
-  $('#tabProgress').addEventListener('click',()=>{ showPage('progress'); setTimeout(scrollTodayIntoView,0); });
-  $('#tabClass').addEventListener('click',()=>showPage('class'));
-  $('#tabRank').addEventListener('click',()=>showPage('rank'));
-  $('#tabEdit').addEventListener('click',()=>showPage('edit'));
-
-  function setActiveTab(t1,t2,t3,t4){
-    $('#tabProgress').classList.toggle('active', t1);
-    $('#tabClass').classList.toggle('active', t2);
-    $('#tabRank').classList.toggle('active', t3);
-    $('#tabEdit').classList.toggle('active', t4);
-  }
-
-  function showPage(which){
-    const p1=$('#pageProgress'), p2=$('#pageClass'), p3=$('#pageRank'), p4=$('#pageEdit');
-    const show = (a,b)=>{ a.style.display='block'; b.forEach(x=>x.style.display='none'); };
-    if(which==='progress'){
-      show(p1,[p2,p3,p4]); setActiveTab(true,false,false,false);
-      stopClassTicker(); renderProgress();
-    }
-    if(which==='class'){
-      show(p2,[p1,p3,p4]); setActiveTab(false,true,false,false);
-      buildClassroom(); restartClassTicker();
-    }
-    if(which==='rank'){
-      show(p3,[p1,p2,p4]); setActiveTab(false,false,true,false);
-      stopClassTicker(); renderRank();
-    }
-    if(which==='edit'){
-      show(p4,[p1,p2,p3]); setActiveTab(false,false,false,true);
-      stopClassTicker(); renderEditPage();
-    }
-  }
-  const PAGES = ['progress','class','rank','edit'];
-  function pageIndexNow(){
-    if($('#pageProgress').style.display!=='none') return 0;
-    if($('#pageClass').style.display!=='none') return 1;
-    if($('#pageRank').style.display!=='none') return 2;
-    return 3;
-  }
-  $('#pagePrev').addEventListener('click',()=>{
-    const i = pageIndexNow(); const ni = (i+4-1)%4; showPage(PAGES[ni]); if(ni===0) setTimeout(scrollTodayIntoView,0);
-  });
-  $('#pageNext').addEventListener('click',()=>{
-    const i = pageIndexNow(); const ni = (i+1)%4; showPage(PAGES[ni]); if(ni===0) setTimeout(scrollTodayIntoView,0);
-  });
-
-  // 月移動
-  $('#prev').addEventListener('click',()=>{ pushHistory(); flushAutoSave(); month-=1; if(month<0){month=11;year-=1;} renderProgress(); renderRank(); });
-  $('#next').addEventListener('click',()=>{ pushHistory(); flushAutoSave(); month+=1; if(month>11){month=0;year+=1;} renderProgress(); renderRank(); });
-
-  // 保存/読込（手動）
-  $('#save').addEventListener('click',save);
-  $('#load').addEventListener('click',()=>{ const ok=load(); renderProgress(); renderRank(); alert(ok?'読み込みました':'保存データが見つかりません'); });
-
-  // 表示切替
-  $('#toggleCompact').addEventListener('click',()=>{ document.body.classList.toggle('compact'); setTimeout(scrollTodayIntoView,0); });
-
-  // 取込（貼付/ファイル/OCR）
-  $('#importPaste').addEventListener('click',()=>{
-    if(showAll){ alert('全科目（一覧）では取込できません。科目を選んでください。'); return; }
-    const text = prompt('日付と種別の一覧や、縦一列の表を貼り付け（例: 8/13(日) 休日 など）');
-    if(!text) return;
-    pushHistory();
-    const n = parseTypeImport(text) || importAnyText(text);
-    renderProgress(); renderRank();
-    alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした（見出し・月・書式を確認）');
-  });
-  $('#importFile').addEventListener('change',async (e)=>{
-    if(showAll){ alert('全科目（一覧）では取込できません。科目を選んでください。'); e.target.value=''; return; }
-    const f=e.target.files?.[0]; if(!f) return;
-    const txt=await f.text();
-    pushHistory();
-    const n= importAnyText(txt);
-    renderProgress(); renderRank();
-    alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした（見出し・当月か要確認）');
-    e.target.value='';
-  });
-  $('#importImg').addEventListener('change',async (e)=>{
-    if(showAll){ alert('全科目（一覧）では取込できません。科目を選んでください。'); e.target.value=''; return; }
-    const f=e.target.files?.[0]; if(!f) return;
-    try{
-      const text = await ocrImage(f);
-      pushHistory();
-      const n = importAnyText(text) || parseTypeImport(text||'');
-      renderProgress(); renderRank();
-      alert(n?`OCR取込で当月に ${n} 件反映しました`:'文字が認識できないか、当月データが見つかりませんでした');
-    }catch(err){
-      alert('OCRに失敗しました。画像の鮮明さ・照明・傾きを確認してください。');
-    }finally{
-      e.target.value='';
-    }
-  });
-
-  // Undo/Redo/全削除
-  $('#undoP').onclick = $('#undoC').onclick = $('#undoT').onclick = ()=>{ undo(); setTimeout(scrollTodayIntoView,0); };
-  $('#redoP').onclick = $('#redoC').onclick = $('#redoT').onclick = ()=>{ redo(); setTimeout(scrollTodayIntoView,0); };
-  $('#wipeP').onclick = ()=>{ if(confirm((showAll?'全科目の今月行をすべて初期化します。':'当月の進捗を初期化します。')+'よろしいですか？')){
-      pushHistory();
-      if(showAll){
-        subjects.forEach(sub=>{
-          const arr = loadSubjectMonth(sub);
-          monthDates(year,month).forEach(ds=>{
-            const r=arr.find(x=>x.date===ds);
-            if(r){ r.type='学習'; r.goal=''; r.result=''; r.review=''; r.color='normal'; }
-          });
-          doSaveToLocal(sub, arr);
-        });
-      }else{
-        rows.forEach(r=>{ r.type='学習'; r.goal=''; r.result=''; r.review=''; r.color='normal'; });
-        touch();
-      }
-      renderProgress(); renderRank();
-    } };
-  $('#wipeC').onclick = ()=>{ if(confirm('Cページの発話状態をリセットしますか？')){ recentLines.length=0; lastSpokenAt.clear(); buildClassroom(); } };
-  $('#wipeT').onclick = ()=>{ if(confirm('ランキング表示を再計算しますか？')){ renderRank(); } };
-
-  // 🐹＝ホーム＆今日へ
-  $('#fabHome').addEventListener('click',()=>{ showPage('progress'); setTimeout(scrollTodayIntoView,0); });
-
-  // R＝強制リロード（キャッシュバイパス）
-  $('#reloadBtn').addEventListener('click',()=>{
-    const url = location.pathname + '?r=' + Date.now();
-    location.replace(url);
-  });
-
-  // ②ページ 速さ%増し
-  (function initBoost(){
-    const saved = localStorage.getItem(BOOST_KEY);
-    const v = saved ? Number(saved) : 0;
-    $('#boostInput').value = String(isFinite(v)?v:0);
-    updateBoostHint();
-  })();
-  function updateBoostHint(){
-    const v = getBoost();
-    $('#boostHint').textContent = `（現在: ${v}%増し / 間隔と吹き出し時間を短縮）`;
-  }
-  $('#applyBoost').addEventListener('click',()=>{
-    const v = getBoost();
-    localStorage.setItem(BOOST_KEY, String(v));
-    updateBoostHint();
-    restartClassTicker();
-  });
-  $('#boostInput').addEventListener('change',()=>{
-    const v = getBoost();
-    localStorage.setItem(BOOST_KEY, String(v));
-    updateBoostHint();
-    restartClassTicker();
-  });
-
-  // 初期化
-  function renderAll(){
-    renderSubjectSelect();
-    $('#toggleAll').checked = showAll;
-    const p1 = $('#pageProgress').style.display!=='none';
-    const p2 = $('#pageClass').style.display!=='none';
-    const p3 = $('#pageRank').style.display!=='none';
-    const p4 = $('#pageEdit').style.display!=='none';
-    if(p1) renderProgress();
-    if(p2) { buildClassroom(); restartClassTicker(); }
-    if(p3) renderRank();
-    if(p4) renderEditPage();
-  }
-  (function init(){
-    // 旧キー移行（科目なし旧形式はスキップ）
-    renderSubjectSelect();
-    load(); renderProgress(); document.body.classList.add('compact'); renderRank();
-    setTimeout(scrollTodayIntoView,0);
-  })();
-
-})();
-</script>
-</body>
-</html>
+    '綾瀬はるか','永野芽郁','石原さとみ','北川景色','有村架純
