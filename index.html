@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Study Planner – v17</title>
+<title>Study Planner – v17b</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 <style>
   :root{
@@ -51,6 +51,7 @@
   tr:hover td{background:#f9fafb}
   tr.today td{background:var(--today-bg)!important;color:var(--today-text)!important}
   .done-row td{background:var(--doneTint)!important;color:#111!important}
+  .tinted td{background:var(--tint)!important}
 
   .col-date{width:160px}
   .col-type{width:160px}
@@ -58,8 +59,6 @@
   .col-donebtn{width:120px}
   .cell{display:flex;align-items:center;gap:8px}
   .type-buttons .chip{min-width:68px;text-align:center}
-
-  .tinted td{background:var(--tint) !important}
 
   .fab{
     position:fixed;z-index:5;width:54px;height:54px;border-radius:50%;
@@ -135,7 +134,7 @@
 </head>
 <body>
   <h1>
-    学習計画（1ヶ月表示 v17）
+    学習計画（1ヶ月表示 v17b）
     <button id="reloadBtn" class="pill" title="強制リロード">R</button>
   </h1>
 
@@ -326,7 +325,7 @@
   'use strict';
 
   /* ===== Keys ===== */
-  const NS='studyplanner.v17';
+  const NS='studyplanner.v17b';
   const NAME_KEY   = `${NS}.displayName`;
   const SUBJ_KEY   = `${NS}.subjects`;
   const COL_KEY    = `${NS}.subjectColors`;
@@ -383,9 +382,9 @@
   function colorFor(subj){
     const c = subjectColors[subj];
     if(c && c.hex){ return {hex:c.hex, tint: Math.max(0,Math.min(95,c.tint??20))}; }
-    if(/英語/.test(subj)) return {hex:'#BD3039', tint:20};
-    if(/数学/.test(subj)) return {hex:'#134A8E', tint:20};
-    if(/世界史/.test(subj)) return {hex:'#005A9C', tint:18};
+    if(/英語/.test(subj)) return {hex:'#BD3039', tint:20};   // Red Sox
+    if(/数学/.test(subj)) return {hex:'#134A8E', tint:20};   // Blue Jays
+    if(/世界史/.test(subj)) return {hex:'#005A9C', tint:18}; // Dodgers
     return {hex:'#2563eb', tint:16};
   }
   function loadDoneColor(){ try{ const raw=localStorage.getItem(DONE_KEY); return raw? JSON.parse(raw): {hex:'#B0A89F', tint:34}; }catch(_){ return {hex:'#B0A89F', tint:34}; } }
@@ -404,19 +403,20 @@
   let autoSaveTimer=null;
   function touch(){
     if(autoSaveTimer) clearTimeout(autoSaveTimer);
-    autoSaveTimer=setTimeout(()=>{
-      if(showAll){
-        const map = new Map();
-        rows.forEach(r=>{ const subj=r._subject||subject; if(!map.has(subj)) map.set(subj,[]); map.get(subj).push(stripSubject(r)); });
-        map.forEach((arr,subj)=> doSaveToLocal(subj, arr));
-      }else{
-        doSaveToLocal(subject, rows);
-      }
-      autoSaveTimer=null;
-    }, 600);
+    autoSaveTimer=setTimeout(()=>{ persistAll(); autoSaveTimer=null; }, 600);
   }
-  function flushAutoSave(){ if(autoSaveTimer){ clearTimeout(autoSaveTimer); autoSaveTimer=null; } if(showAll){ const map=new Map(); rows.forEach(r=>{ const subj=r._subject||subject; if(!map.has(subj)) map.set(subj,[]); map.get(subj).push(stripSubject(r)); }); map.forEach((arr,subj)=> doSaveToLocal(subj, arr)); } else { doSaveToLocal(subject, rows); } }
+  function persistAll(){
+    if(showAll){
+      const map = new Map();
+      rows.forEach(r=>{ const subj=r._subject||subject; if(!map.has(subj)) map.set(subj,[]); map.get(subj).push(stripSubject(r)); });
+      map.forEach((arr,subj)=> doSaveToLocal(subj, arr));
+    }else{
+      doSaveToLocal(subject, rows);
+    }
+  }
+  function flushAutoSave(){ if(autoSaveTimer){ clearTimeout(autoSaveTimer); autoSaveTimer=null; } persistAll(); }
   window.addEventListener('beforeunload', flushAutoSave);
+  window.addEventListener('visibilitychange', ()=>{ if(document.hidden) flushAutoSave(); });
   function stripSubject(r){ const { _subject, ...rest } = r; return rest; }
 
   function load(){ if(showAll){ const merged=[]; subjects.forEach(sub=>{ const arr=loadSubjectMonth(sub); arr.forEach(r=> merged.push({...r,_subject:sub})); }); rows=merged.sort((a,b)=> a.date===b.date? (a._subject||'').localeCompare(b._subject||'') : a.date.localeCompare(b.date)); } else { rows=loadSubjectMonth(subject); } return true; }
@@ -444,18 +444,16 @@
 
   let people = loadPeople();
 
-  // Lines（初期異なるメッセージを軽量セット）
+  // Lines
   function loadCustomLines(){
     try{
       const raw=localStorage.getItem(LINES_KEY);
       if(raw) return JSON.parse(raw) || {};
-      // 初回：人ごとの短文を生成
       const obj={}; people.forEach(p=>{
         const base=[
           '今日の自分に勝とう！','小さな完了を積み上げよう','休むのも戦略','区切っていけば絶対できる',
           '5分だけでも手を動かす','間違いは伸びしろ','メモに残そう','姿勢を立て直そう','音読は裏切らない'
         ];
-        // ちょっと変化
         obj[p.name]=[ base[(Math.random()*base.length)|0], `${p.traits.tokui}伸びてる！`, `苦手の${p.traits.nigate}も一歩！` ];
       });
       localStorage.setItem(LINES_KEY, JSON.stringify(obj));
@@ -497,7 +495,7 @@
       const tr=document.createElement('tr');
       const isDone = (r.color==='gray') || (r.type==='休日');
       if(r.date===todayStr) tr.classList.add('today');
-      if(!showAll && !isDone){ tr.classList.add('tinted'); tr.style.setProperty('--tint', themeTint); }
+      if(!isDone){ tr.classList.add('tinted'); tr.style.setProperty('--tint', themeTint); }
       if(isDone){ tr.classList.add('done-row'); tr.style.setProperty('--doneTint', doneTint); }
 
       // 日付
@@ -510,7 +508,7 @@
         <button class="chip btnType ${r.type==='休日'?'active':''}" data-val="休日">休日</button>
       </div>`;
 
-      // 入力列
+      // 入力列（値は常に保持。既存の数字類は消さない）
       const tdGoal=document.createElement('td'); tdGoal.className='col-goal';
       const inGoal=document.createElement('input'); inGoal.type='text'; inGoal.placeholder='例：世界史 23〜24'; inGoal.value=(r.goal??'');
       tdGoal.appendChild(inGoal);
@@ -530,22 +528,25 @@
 
       // 反応：種別
       tdType.querySelectorAll('.btnType').forEach(btn=>{
-        btn.addEventListener('click',()=>{
+        btn.addEventListener('click',(ev)=>{
           pushHistory();
           const v=btn.dataset.val;
-          r.type=v; // 既存の文字は消さない
-          // 休日は視覚的に「完了色」で表示（ポイントはholiday値）
-          persist(r); touch(); renderProgress(); scrollTodayIntoView();
+          r.type=v;
+          // 休日は見た目を完了色で即反映（保存も即）
+          persist(r); touch(); renderProgress();
+          // 反応が分かるようにポップ
+          const base = pointsForType(r.type||'学習');
+          showPop(ev.target, (base>0?`+${base}`:'+0'));
+          scrollTodayIntoView();
         });
       });
 
       // 反応：完了
       btnDone.addEventListener('click',(ev)=>{
-        if(r.color==='gray') return; // 一方通行（戻したい時は「全削除/編集」で）
+        if(r.color==='gray') return;
         pushHistory();
         r.color='gray';
         persist(r); touch(); renderProgress(); scrollTodayIntoView();
-        // ポップ
         const base = pointsForType(r.type||'学習');
         showPop(ev.target, `+${base}`);
       });
@@ -559,9 +560,10 @@
       // キー移動（上下左右/Enter）
       const focusables=[inGoal,inRes,inRev,btnDone];
       focusables.forEach((el,colIndex)=>{
-        el.dataset.rowIndex=rowIndex; el.dataset.colIndex=colIndex;
+        el.setAttribute('data-row-index', rowIndex);
+        el.setAttribute('data-col-index', colIndex);
         el.addEventListener('keydown',(ev)=>{
-          const rIdx=+el.dataset.rowIndex, cIdx=+el.dataset.colIndex;
+          const rIdx=+el.getAttribute('data-row-index'); const cIdx=+el.getAttribute('data-col-index');
           let nr=rIdx, nc=cIdx;
           if(ev.key==='ArrowDown') nr=rIdx+1;
           if(ev.key==='ArrowUp')   nr=rIdx-1;
@@ -605,7 +607,7 @@
     setTimeout(()=>{ pop.remove(); }, 1200);
   }
 
-  /* ===== Import (CSV/Paste/OCR) — 省略：以前と同等 ===== */
+  /* ===== Import (CSV/Paste/OCR) — v17相当 ===== */
   function normalizeDateToken(raw){ if(!raw) return null; let s=String(raw).trim(); s=s.replace(/（.*?）|\(.*?\)/g,''); s=s.replace(/[．。・‒–—―〜～]/g,'-'); let m=s.match(/^(\d{4})\s*[-/]\s*(\d{1,2})\s*[-/]\s*(\d{1,2})$/); if(m) return {y:+m[1],mo:+m[2]-1,d:+m[3]}; m=s.match(/^(\d{1,2})\s*(?:\/|月)\s*(\d{1,2})/); if(m){ const y=year; return {y,mo:+m[1]-1,d:+m[2]}; } return null; }
   function clean(v){ const s=String(v??'').trim(); if(!s) return ''; if(/^(nan|null|undefined)$/i.test(s)) return ''; return s; }
   function parseDelimited(text){ if(text.charCodeAt(0)===0xFEFF) text=text.slice(1); const sep=(text.indexOf('\t')!==-1)?'\t':','; const lines=text.replace(/\r\n?/g,'\n').split('\n').filter(l=>l.trim()!==''); const header=lines[0].split(sep).map(s=>s.trim()); const rows=lines.slice(1).map(line=>{ const cells=line.split(sep); const obj={}; header.forEach((h,i)=> obj[h]=(cells[i]??'').trim()); return obj; }); return {header,rows}; }
@@ -623,7 +625,6 @@
       const r=base.find(x=>x.date===date); if(!r) return;
       if(r.color==='gray' || r.type==='休日'){ total += pointsForType(r.type||'学習'); }
     });
-    // ＋日次のゆらぎ
     return total + getDailyPointsFor($('#displayName').value||'橋本淑雅');
   }
 
@@ -720,9 +721,8 @@
       nameInput.addEventListener('change',()=>{
         const newName=(nameInput.value||'').trim(); if(!newName){ nameInput.value=p.name; return; }
         if(people.some((x,ix)=> ix!==i && x.name===newName)){ alert('同名が既にあります'); nameInput.value=p.name; return; }
-        // rename lines key
         customLines[newName]= (customLines[p.name]||[]); delete customLines[p.name];
-        p.name=newName; savePeople(); saveCustomLines(); renderEditPage(); // 再描画
+        p.name=newName; savePeople(); saveCustomLines(); renderEditPage();
       });
       chkFemale.addEventListener('change',()=>{ p.female=chkFemale.checked; savePeople(); });
       chkFamous.addEventListener('change',()=>{ p.famous=chkFamous.checked; savePeople(); });
@@ -820,7 +820,7 @@
         <div>${p.pts} pt</div>`;
       wrap.appendChild(row);
 
-      // 編集系（浪数/現役/年齢/ノルマ達成率）
+      // 編集系
       const editor=document.createElement('div'); editor.className='row small';
       const pr=person.profile||{age:null, ron:0, geneki:true, quota:0};
       editor.innerHTML=`
@@ -852,7 +852,6 @@
   function rankLiveTick(){
     const hour=(new Date()).getHours();
     if(hour>=18){ $('#rankTicker').textContent='本日のライブ加点は終了（以降は翌日に反映）'; return; }
-    // ノルマ達成率の高い人ほど上がりやすく
     const pool = people.filter(p=>p.name!==($('#displayName').value||'橋本淑雅'));
     const nChanges=4;
     for(let i=0;i<nChanges;i++){
@@ -870,7 +869,7 @@
   }
   setInterval(rankLiveTick, 30000);
 
-  // 応援フラグ（ランクアップ者）
+  // 応援フラグ
   const cheerers=new Set();
   function flagCheer(name, delta){ if(delta>=9) cheerers.add(name+'+9'); else if(delta>=7) cheerers.add(name+'+7'); else if(delta>=5) cheerers.add(name+'+5'); else if(delta>=3) cheerers.add(name+'+3'); else if(delta>=1) cheerers.add(name+'+1'); }
   function getCheerPrefixFor(name){
@@ -884,7 +883,6 @@
       7:`【爆伸び】${me}、止まらないね！`,
       9:`【本日主役】${me}、今日決めよう！`
     };
-    // 5秒だけ強調したら解除
     setTimeout(()=>{ cheerers.delete(name+'+'+key); }, 5000);
     return map[key];
   }
@@ -951,10 +949,10 @@
   $('#saveName').addEventListener('click',()=>{ const me=(($('#displayName').value)||'橋本淑雅').trim(); localStorage.setItem(NAME_KEY,me); $('#meOnBoard').textContent=me; renderRank(); });
 
   // Tabs
-  $('#tabProgress').addEventListener('click',()=>{ showPage('progress'); setTimeout(scrollTodayIntoView,0); });
-  $('#tabClass').addEventListener('click',()=>showPage('class'));
-  $('#tabRank').addEventListener('click',()=>showPage('rank'));
-  $('#tabEdit').addEventListener('click',()=>showPage('edit'));
+  $('#tabProgress').addEventListener('click',()=>{ flushAutoSave(); showPage('progress'); setTimeout(scrollTodayIntoView,0); });
+  $('#tabClass').addEventListener('click',()=>{ flushAutoSave(); showPage('class'); });
+  $('#tabRank').addEventListener('click',()=>{ flushAutoSave(); showPage('rank'); });
+  $('#tabEdit').addEventListener('click',()=>{ flushAutoSave(); showPage('edit'); });
   function setActiveTab(a,b,c,d){ $('#tabProgress').classList.toggle('active',a); $('#tabClass').classList.toggle('active',b); $('#tabRank').classList.toggle('active',c); $('#tabEdit').classList.toggle('active',d); }
   function showPage(which){
     const p1=$('#pageProgress'), p2=$('#pageClass'), p3=$('#pageRank'), p4=$('#pageEdit');
@@ -970,7 +968,14 @@
   $('#next').addEventListener('click',()=>{ pushHistory(); flushAutoSave(); month+=1; if(month>11){month=0;year+=1;} renderProgress(); renderRank(); });
 
   // 保存/読込
-  $('#save').addEventListener('click',()=>{ pushHistory(); flushAutoSave(); alert('更新しました（この端末のブラウザ内）'); renderRank(); scrollTodayIntoView(); });
+  $('#save').addEventListener('click',()=>{
+    pushHistory();
+    flushAutoSave();              // まず確実に保存
+    renderProgress();             // ← ここを追加：テーブルが真っ白に見えないよう即再描画
+    renderRank();
+    alert('更新しました（この端末のブラウザ内）');
+    scrollTodayIntoView();
+  });
   $('#load').addEventListener('click',()=>{ const ok=load(); renderProgress(); renderRank(); alert(ok?'読み込みました':'保存データが見つかりません'); });
 
   // コンパクト
@@ -1018,7 +1023,7 @@
 
   // 全科目ボタン
   function highlightAllToggle(){ $('#allIcon').textContent = showAll? '📖':'📚'; $('#toggleAllBtn').classList.toggle('active', showAll); }
-  $('#toggleAllBtn').addEventListener('click',()=>{ pushHistory(); showAll=!showAll; renderProgress(); highlightAllToggle(); });
+  $('#toggleAllBtn').addEventListener('click',()=>{ pushHistory(); flushAutoSave(); showAll=!showAll; renderProgress(); highlightAllToggle(); });
 
   // 科目/色
   const PRESETS={ redsox:{hex:'#BD3039',tint:20}, bluejays:{hex:'#134A8E',tint:20}, dodgers:{hex:'#005A9C',tint:18}, nl:{hex:'#13274F',tint:18} };
@@ -1032,7 +1037,7 @@
 
   // 科目選択
   $('#addSubject').addEventListener('click',()=>{ const name=prompt('追加する科目名（例：英語）'); if(!name) return; const trimmed=name.trim(); if(!trimmed) return; if(subjects.includes(trimmed)){ alert('その科目はすでにあります'); return; } subjects.push(trimmed); saveSubjects(); renderSubjectSelect(); subject=trimmed; showAll=false; renderProgress(); });
-  $('#subjectSelect').addEventListener('change',e=>{ pushHistory(); subject=e.target.value; showAll=false; renderProgress(); });
+  $('#subjectSelect').addEventListener('change',e=>{ pushHistory(); flushAutoSave(); subject=e.target.value; showAll=false; renderProgress(); });
 
   /* ===== Init ===== */
   function renderAll(){
@@ -1045,7 +1050,6 @@
     if(p2){ buildClassroom(); restartClassTicker(); }
     if(p3) renderRank();
     if(p4) renderEditPage();
-    // UI 初期値
     const theme=colorFor(subject); $('#colorPicker').value=theme.hex; $('#tintRange').value=theme.tint;
     $('#doneColorPicker').value=doneColor.hex; $('#doneTintRange').value=doneColor.tint;
     $('#ptStudy').value=pointsCfg.study; $('#ptReview').value=pointsCfg.review; $('#ptHoliday').value=pointsCfg.holiday;
