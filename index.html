@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Study Planner – v17.10</title>
+<title>Study Planner – v17.12</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 <style>
   :root{
@@ -50,7 +50,6 @@
   tr:hover td{background:#f9fafb}
   tr.today td{background:var(--today-bg)!important;color:var(--today-text)!important}
   .tinted td{background:var(--tint)!important}
-  /* ←ここより下に done を置き、特異性で today を上書きする */
   tr.done-row td{background:var(--doneTint)!important;color:#111!important}
   tr.today.done-row td{background:var(--doneTint)!important;color:#111!important}
 
@@ -88,15 +87,10 @@
   .bubble.yell{font-size:22px;padding:16px 18px}
   @keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 
+  .rank-wrap{display:grid;grid-template-columns:1fr 340px;gap:12px}
+  @media(max-width:960px){ .rank-wrap{grid-template-columns:1fr} }
   .rank-card{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff}
   .rank-rules{font-size:13px;color:#374151;background:#f9fafb;border:1px dashed #d1d5db;border-radius:8px;padding:8px;margin-bottom:8px}
-  .legend .tag{border-radius:6px;padding:2px 6px;border:1px solid #e5e7eb;font-size:12px}
-  .risePink{background:#ffe4ef}
-  .riseBlue{background:#e1effe}
-  .riseGreen{background:#dcfce7}
-  .riseYellow{background:#fef9c3}
-  .riseRed{background:#fee2e2}
-
   .rank-grid{column-width:260px;column-gap:16px}
   .rank-item{break-inside:avoid;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0;background:#fff}
   .rank-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -106,15 +100,27 @@
   .inp-mini{width:4.5em;padding:4px 6px;border-radius:8px;font-size:12px}
   .sel-mini{padding:4px 6px;border-radius:8px;font-size:12px}
 
+  /* ランク変動フラッシュ */
+  @keyframes flashUp   { 0%,100%{background:transparent} 50%{background:rgba(134,239,172,.65)} }
+  @keyframes flashDown { 0%,100%{background:transparent} 50%{background:rgba(254,202,202,.75)} }
+  .flash-up{animation:flashUp 1.2s ease 1}
+  .flash-down{animation:flashDown 1.2s ease 1}
+
+  .rank-sidebar{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff;max-height:78vh;overflow:auto}
+  .rank-sidebar h4{margin:0 0 8px}
+  .rank-list{counter-reset:rk}
+  .rank-list li{display:flex;justify-content:space-between;gap:8px;padding:6px 4px;border-bottom:1px dashed #e5e7eb}
+  .rank-list li:last-child{border-bottom:none}
+
   .grid-edit{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
   .card{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff}
   .card h4{margin:0 0 6px;display:flex;gap:8px;align-items:center}
   .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 
-  /* Timetable modal */
+  /* Timetable / Import modal */
   .modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:flex-start;justify-content:center;padding:24px;z-index:50}
   .modal.show{display:flex}
-  .panel{width:min(96vw,820px);max-height:80vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 24px 48px rgba(0,0,0,.2);padding:12px}
+  .panel{width:min(96vw,900px);max-height:80vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 24px 48px rgba(0,0,0,.2);padding:12px}
   .tt-grid{display:grid;grid-template-columns:110px 1fr 1fr 1fr; gap:8px; align-items:center}
   .tt-grid > div,.tt-row>div{padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:#fff}
   .tt-row{display:contents}
@@ -123,7 +129,7 @@
 </head>
 <body>
   <h1>
-    学習計画（1ヶ月表示）<span class="muted" id="verTag">v17.10</span>
+    学習計画（1ヶ月表示）<span class="muted" id="verTag">v17.12</span>
     <span class="muted" id="savedAt">最終保存: -</span>
     <button id="reloadBtn" class="pill" title="強制リロード">R</button>
   </h1>
@@ -147,6 +153,13 @@
       <button id="undoP">戻る</button>
       <button id="redoP">進む</button>
       <button id="wipeP">全削除</button>
+      <!-- 取込系をここに新設 -->
+      <button id="btnPasteImport" class="chip">📋 貼り付け取込</button>
+      <label class="chip">
+        📁 ファイル取込
+        <input id="fileImport" type="file" accept=".csv,.tsv,.txt,.text" style="display:none">
+      </label>
+      <button id="btnSheetsImport" class="chip" title="GoogleスプレッドシートのURL/IDから取込">🧩 Sheets取込</button>
     </div>
 
     <!-- 科目/全科目 + テーマ色 + 完了色 + ポイント + 時間割 -->
@@ -212,7 +225,7 @@
           <tr id="theadRow">
             <th class="col-date">日付</th>
             <th class="col-type">種別</th>
-            <th class="col-goal">目標（科目名）</th>
+            <th class="col-goal">目標</th>
             <th class="col-result">結果</th>
             <th class="col-review">復習</th>
             <th class="col-donebtn">完了</th>
@@ -244,26 +257,34 @@
 
   <!-- ===== Page 3: ランキング ===== -->
   <section id="pageRank" style="display:none">
-    <div class="topbar">
-      <button id="undoT">戻る</button>
-      <button id="redoT">進む</button>
-      <button id="wipeT">全削除</button>
-    </div>
-    <div class="rank-card">
-      <div class="rank-rules" id="rankRules">
-        <strong>ポイントのルール</strong><br>
-        ・当日「完了（ジャンガリア色）」にした学習… +<span id="ruleStudy">10</span> / 復習… +<span id="ruleReview">6</span>（「休日」は +<span id="ruleHoliday">0</span>）<br>
-        ・本日のリアルタイム加点は <strong>18:00</strong> まで（以降は翌日に繰越）<br>
-        ・学校勢は 16–18時に加点が伸びやすい／浪人・独学勢は午前～15時も伸びやすい（疑似）<br>
-        ・ランクアップ色：<span class="tag" style="background:#ffe4ef">ピンク</span>（+1〜2位）→
-          <span class="tag" style="background:#e1effe">青</span>（+3〜4位）→
-          <span class="tag" style="background:#dcfce7">緑</span>（+5〜6位）→
-          <span class="tag" style="background:#fef9c3">黄</span>（+7〜8位）→
-          <span class="tag" style="background:#fee2e2">赤</span>（+9位以上）
+    <div class="topbar" style="justify-content:space-between">
+      <div class="row">
+        <button id="undoT">戻る</button>
+        <button id="redoT">進む</button>
+        <button id="wipeT">全削除</button>
       </div>
-      <h3>今月の順位（合計ポイント）</h3>
-      <div id="rankGrid" class="rank-grid"></div>
-      <div id="rankTicker" class="muted" style="margin-top:6px">…更新中</div>
+      <div class="row">
+        <span class="inl small">順位変動スピード(%) <input id="rankSpeed" class="inp-mini" type="number" min="10" max="300" value="100" title="100%=標準、200%=2倍速"></span>
+      </div>
+    </div>
+
+    <div class="rank-wrap">
+      <div class="rank-card">
+        <div class="rank-rules" id="rankRules">
+          <strong>ポイントのルール</strong><br>
+          ・当日「完了（ジャンガリア色）」にした学習… +<span id="ruleStudy">10</span> / 復習… +<span id="ruleReview">6</span>（「休日」は +<span id="ruleHoliday">0</span>）<br>
+          ・本日のリアルタイム加点は <strong>18:00</strong> まで（以降は翌日に繰越）<br>
+          ・学校勢は 16–18時に加点が伸びやすい／浪人・独学勢は午前～15時も伸びやすい（疑似）
+        </div>
+        <h3>今月の順位（合計ポイント）</h3>
+        <div id="rankGrid" class="rank-grid"></div>
+        <div id="rankTicker" class="muted" style="margin-top:6px">…更新中</div>
+      </div>
+
+      <aside class="rank-sidebar">
+        <h4>全員の一覧</h4>
+        <ol id="rankList" class="rank-list"></ol>
+      </aside>
     </div>
   </section>
 
@@ -298,7 +319,7 @@
         <div class="muted">開始</div><div class="muted">終了</div><div class="muted">内容</div><div class="muted">操作</div>
       </div>
       <div id="ttRows"></div>
-      <div id="ttSuggestBar" class="row" style="gap:10px; align-items:center; margin-top:10px; display:none">
+      <div class="ttSuggestBar row" id="ttSuggestBar" style="gap:10px; align-items:center; margin-top:10px; display:none">
         <button id="ttPrev" class="chip">◀ 前</button>
         <span id="ttIndex" class="muted">1 / 20</span>
         <button id="ttNext" class="chip">次 ▶</button>
@@ -313,10 +334,10 @@
 <script>
 (function(){
   'use strict';
-  const VER='v17.10';
+  const VER='v17.12';
 
   /* ===== Keys ===== */
-  const NS='studyplanner.v17';
+  const NS='studyplanner.v17'; // 既存データと互換
   const NAME_KEY   = `${NS}.displayName`;
   const SUBJ_KEY   = `${NS}.subjects`;
   const COL_KEY    = `${NS}.subjectColors`;
@@ -346,22 +367,8 @@
     people, customLines
   }));
   function pushHistory(){ history.past.push(snapshot()); history.future.length=0; }
-  function undo(){
-    if(!history.past.length) return;
-    const cur=snapshot();
-    const prev=history.past.pop();
-    history.future.push(cur);
-    ({year,month,rows,subject,showAll,subjectColors,doneColor,pointsCfg,people,customLines}=prev);
-    renderAll();
-  }
-  function redo(){
-    if(!history.future.length) return;
-    const cur=snapshot();
-    const nxt=history.future.pop();
-    history.past.push(cur);
-    ({year,month,rows,subject,showAll,subjectColors,doneColor,pointsCfg,people,customLines}=nxt);
-    renderAll();
-  }
+  function undo(){ if(!history.past.length) return; const cur=snapshot(); const prev=history.past.pop(); history.future.push(cur); ({year,month,rows,subject,showAll,subjectColors,doneColor,pointsCfg,people,customLines}=prev); renderAll(); }
+  function redo(){ if(!history.future.length) return; const cur=snapshot(); const nxt=history.future.pop(); history.past.push(cur); ({year,month,rows,subject,showAll,subjectColors,doneColor,pointsCfg,people,customLines}=nxt); renderAll(); }
 
   /* ===== Utils ===== */
   const $=s=>document.querySelector(s);
@@ -403,13 +410,10 @@
     arr.sort((a,b)=>a.date.localeCompare(b.date));
   }
   function loadSubjectMonth(s=subject){ const raw=localStorage.getItem(currentKey(s)); let arr=[]; if(raw){ try{ arr=JSON.parse(raw)||[]; }catch(_){ } } ensureScaffoldFor(arr); return arr; }
-  function doSaveToLocal(s=subject, dataRows=rows){
-    const data=dataRows.filter(r=>{ const d=fromYmd(r.date); return d.getMonth()===month && d.getFullYear()===year; });
-    try{ localStorage.setItem(currentKey(s), JSON.stringify(data)); }catch(_){} }
+  function doSaveToLocal(s=subject, dataRows=rows){ const data=dataRows.filter(r=>{ const d=fromYmd(r.date); return d.getMonth()===month && d.getFullYear()===year; }); try{ localStorage.setItem(currentKey(s), JSON.stringify(data)); }catch(_){} }
   function stripSubject(r){ const { _subject, ...rest } = r; return rest; }
   function persist(rec){ const i=rows.findIndex(x=>x.date===rec.date && (showAll? (x._subject===rec._subject):true)); if(i>=0) rows[i]=rec; else rows.push(rec); }
 
-  // 表示再読込は必要な時だけ
   function reloadRows(){
     if(showAll){
       const merged=[];
@@ -424,14 +428,13 @@
     return true;
   }
 
-  /* ===== SavedAt ===== */
+  /* ===== SavedAt & Autosave ===== */
   function setSavedNow(){
     const t=new Date();
     const s = `${t.getFullYear()}/${String(t.getMonth()+1).padStart(2,'0')}/${String(t.getDate()).padStart(2,'0')} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`;
     const el=$('#savedAt'); if(el) el.textContent = `最終保存: ${s}`;
   }
 
-  /* ===== Autosave（スナップショット保存） ===== */
   let autoSaveTimer=null;
   function computeSavePayload(){
     const map = new Map();
@@ -447,7 +450,7 @@
     return map;
   }
   function scheduleSave(){
-    const payload = computeSavePayload(); // スナップショットを固定
+    const payload = computeSavePayload();
     if(autoSaveTimer) clearTimeout(autoSaveTimer);
     autoSaveTimer=setTimeout(()=>{
       payload.forEach((arr,subj)=> doSaveToLocal(subj, arr));
@@ -485,18 +488,39 @@
   function savePeople(){ try{ localStorage.setItem(PEOPLE_KEY, JSON.stringify(people)); }catch(_){} }
   let people = loadPeople();
 
+  // 20個の個性的な初期セリフ（人物ごとに内容を変化）＋表示名の人を重点的に
+  function makeDefaultLinesFor(p){
+    const n=p.name, t=p.traits||{}, pr=p.profile||{};
+    const pieces=[
+      `【${n}】昨日より解く速さが上がってる、積み重ねが効いてるよ！`,
+      `【${n}】${t.tokui||'得意科目'}の伸びが目に見える、ペースを崩さずいこう。`,
+      `【${n}】間違いのメモが良い、次の一問で活きるはず。`,
+      `【${n}】もう5分継続できたら今日の自分を越えられる、いける。`,
+      `【${n}】休憩の入れ方が上手、集中が長持ちしてる！`,
+      `【${n}】${t.nigate||'苦手'}の一歩が尊い、前進してるから自信持って。`,
+      `【${n}】姿勢が良いと頭も冴える、いまそのフォーム最高。`,
+      `【${n}】音読は記憶を強くする、声が出せたらさらに良いね。`,
+      `【${n}】目標を数字で刻めてる、達成の道筋がはっきりしてきた。`,
+      `【${n}】${pr.geneki?'現役の勢い':'落ち着き'}が出てる、安定して強い。`,
+      `【${n}】ノートの余白の使い方がスマート、見返しやすい！`,
+      `【${n}】わからなかった所を放置してない、その姿勢は伸びる。`,
+      `【${n}】今日は${t.tokui||'得意'}で点を稼げる日、やり切ろう。`,
+      `【${n}】解き直しの回数が増えてる、定着スピードが違う。`,
+      `【${n}】区切り方がうまい、集中スイッチの入りが早い！`,
+      `【${n}】一問にこだわる粘りが素敵、結果は後から付いてくる。`,
+      `【${n}】小さな完了でも胸を張っていい、継続は最大の武器。`,
+      `【${n}】${t.seikaku||'マイペース'}なリズムが功を奏してる、ぶれない。`,
+      `【${n}】見直しの印が増えてる、丁寧さが点に変わるよ。`,
+      `【${n}】今日のあなた、確実に昨日より強い。自分で作った成長だよ。`
+    ];
+    return pieces;
+  }
+
   function loadCustomLines(){
     try{
       const raw=localStorage.getItem(LINES_KEY);
       if(raw) return JSON.parse(raw) || {};
-      // 初回は人ごとに違う短文を入れて保存
-      const obj={}; people.forEach(p=>{
-        const base=[
-          '今日の自分に勝とう！','小さな完了を積み上げよう','休むのも戦略','区切っていけば絶対できる',
-          '5分だけでも手を動かす','間違いは伸びしろ','メモに残そう','姿勢を立て直そう','音読は裏切らない'
-        ];
-        obj[p.name]=[ base[(Math.random()*base.length)|0], `${p.traits.tokui}伸びてる！`, `苦手の${p.traits.nigate}も一歩！` ];
-      });
+      const obj={}; people.forEach(p=>{ obj[p.name]=makeDefaultLinesFor(p); });
       localStorage.setItem(LINES_KEY, JSON.stringify(obj));
       return obj;
     }catch(_){ return {}; }
@@ -508,7 +532,6 @@
 
   /* ===== Page1: Render ===== */
   function renderProgress(){
-    // ここで reloadRows() は呼ばない（競合回避）
     const days = monthDates(year,month).length;
     const label=$('#label'); if(label) label.textContent = showAll? `全科目 ${year}年${month+1}月（${days}日）` : `${subject} — ${year}年${month+1}月（${days}日）`;
 
@@ -572,35 +595,28 @@
       const btnDone=document.createElement('button'); btnDone.className='chip'; btnDone.textContent='完了';
       tdDone.appendChild(btnDone);
 
-      // 入力変更
+      // 入力変更（即保存）
       const onInput=(field)=>(e)=>{ r[field]=e.target.value; persist(r); scheduleSave(); };
       inGoal.addEventListener('input', onInput('goal'));
       inRes .addEventListener('input', onInput('result'));
       inRev .addEventListener('input', onInput('review'));
 
-      // 種別クリック
+      // 種別クリック（学習に戻したら色もデフォルトへ）
       tdType.querySelectorAll('.btnType').forEach(btn=>{
         btn.addEventListener('click',()=>{
           const v=btn.dataset.val;
           r.type=v;
+          if(v==='学習') r.color='normal';
           persist(r); scheduleSave(); renderProgress();
-          // 自動スクロールしない
         });
       });
 
-      // 完了トグル
+      // 完了トグル（灰色⇄元の色）
       btnDone.addEventListener('click',(ev)=>{
         const wasDone = (r.color==='gray');
-        if(wasDone){
-          r.color='normal'; // 解除
-          persist(r); scheduleSave(); renderProgress();
-          popAt(ev.target, `−${pointsForType(r.type||'学習')}`, '#ef4444');
-        }else{
-          r.color='gray'; // 完了
-          persist(r); scheduleSave(); renderProgress();
-          popAt(ev.target, `+${pointsForType(r.type||'学習')}`, '#10b981');
-        }
-        // 自動スクロールしない
+        r.color = wasDone? 'normal':'gray';
+        persist(r); scheduleSave(); renderProgress();
+        popAt(ev.target, `${wasDone?'−':'+'}${pointsForType(r.type||'学習')}`, wasDone?'#ef4444':'#10b981');
       });
 
       // 矢印キー移動
@@ -646,19 +662,156 @@
     const scroller=$('#scroller'); if(!scroller) return;
     const thead=scroller.querySelector('thead'); const todayRow=scroller.querySelector('tr.today');
     if(!todayRow||!thead) return; const headerH=thead.getBoundingClientRect().height; const rowTop=todayRow.offsetTop;
-    scroller.scrollTo({top:Math.max(0,rowTop-headerH-4), behavior:'auto'}); // instant→auto
+    scroller.scrollTo({top:Math.max(0,rowTop-headerH-4), behavior:'auto'});
   }
 
-  /* ===== Import / OCR（元のまま） ===== */
-  function normalizeDateToken(raw){ if(!raw) return null; let s=String(raw).trim(); s=s.replace(/（.*?）|\(.*?\)/g,''); s=s.replace(/[．。・‒–—―〜～]/g,'-'); let m=s.match(/^(\d{4})\s*[-/]\s*(\d{1,2})\s*[-/]\s*(\d{1,2})$/); if(m) return {y:+m[1],mo:+m[2]-1,d:+m[3]}; m=s.match(/^(\d{1,2})\s*(?:\/|月)\s*(\d{1,2})/); if(m){ const y=year; return {y,mo:+m[1]-1,d:+m[2]}; } return null; }
-  function clean(v){ const s=String(v??'').trim(); if(!s) return ''; if(/^(nan|null|undefined)$/i.test(s)) return ''; return s; }
-  function parseDelimited(text){ if(text.charCodeAt(0)===0xFEFF) text=text.slice(1); const sep=(text.indexOf('\t')!==-1)?'\t':','; const lines=text.replace(/\r\n?/g,'\n').split('\n').filter(l=>l.trim()!==''); const header=lines[0].split(sep).map(s=>s.trim()); const rows=lines.slice(1).map(line=>{ const cells=line.split(sep); const obj={}; header.forEach((h,i)=> obj[h]=(cells[i]??'').trim()); return obj; }); return {header,rows}; }
-  function parseTypeImport(text){ const lines=(text||'').replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean); let applied=0; for(const ln of lines){ const parts=ln.split(/[\s,　\t]+/).filter(Boolean); if(parts.length<2) continue; const dtk=normalizeDateToken(parts[0]); if(!dtk) continue; let typ=parts[1].replace(/\s/g,'').trim(); if(typ==='休み') typ='休日'; if(!/^(学習|休日|復習)$/.test(typ)) continue; if(dtk.y!==year||dtk.mo!==month) continue; if(showAll){ alert('全科目では貼付インポート不可'); return 0; } const ds=ymd(new Date(dtk.y,dtk.mo,dtk.d)); const rec=rows.find(x=>x.date===ds); if(rec){ pushHistory(); rec.type=typ; persist(rec); applied++; } } if(applied) scheduleSave(); return applied; }
-  function importCsvText(text){ const {header,rows:objs}=parseDelimited(text); const col={}; header.forEach(h=>{ if(/日付/.test(h)) col.date=h; if(/種別/.test(h)) col.type=h; if(/目標/.test(h)) col.goal=h; if(/結果/.test(h)) col.result=h; if(/復習/.test(h)) col.review=h; }); if(!col.date||!col.type){ alert('CSV見出しを確認'); return 0; } if(showAll){ alert('全科目ではCSV取込不可'); return 0; } let applied=0; for(const o of objs){ const dtk=normalizeDateToken(o[col.date]); if(!dtk) continue; if(dtk.y!==year||dtk.mo!==month) continue; const ds=ymd(new Date(dtk.y,dtk.mo,dtk.d)); const rec=rows.find(x=>x.date===ds); if(!rec) continue; let t=clean(o[col.type]); if(t==='休み') t='休日'; if(/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; } if(col.goal!==undefined) rec.goal=clean(o[col.goal]); if(col.result!==undefined) rec.result=clean(o[col.result]); if(col.review!==undefined) rec.review=clean(o[col.review]); persist(rec); applied++; } if(applied) scheduleSave(); return applied; }
-  function looksLikeColumnBlocks(text){ const L=text.replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean); if(L.length<12) return false; const i=L.findIndex(s=>s.includes('日付')); if(i<0||i+4>=L.length) return false; const head=L.slice(i,i+5); const need=['日付','種別','目標','結果','復習']; if(!need.every((w,idx)=> (head[idx]||'').includes(w))) return false; return L.slice(i+5).some(s=>/^\d{1,2}[\/\-月]\d{1,2}/.test(s)||/^\d{4}-\d{2}-\d{2}$/.test(s)); }
-  function parseColumnBlocks(text){ const L=text.replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean); const i=L.findIndex(s=>s.includes('日付')); const data=L.slice(i+5); const rows=[]; let block={}; let ptr=0; for(const line of data){ if(['日付','種別','目標','結果','復習'].includes(line)) continue; if(ptr===0){ block={}; block['日付']=line; ptr=1; continue; } if(ptr===1){ block['種別']=line; ptr=2; continue; } if(ptr===2){ block['目標']=line; ptr=3; continue; } if(ptr===3){ block['結果']=line; ptr=4; continue; } if(ptr===4){ block['復習']=line; rows.push(block); ptr=0; continue; } } if(ptr!==0){ block['目標']=block['目標']??''; block['結果']=block['結果']??''; block['復習']=block['復習']??''; rows.push(block); } return {header:['日付','種別','目標','結果','復習'], rows}; }
-  function importAnyText(text){ try{ const n=importCsvText(text); if(n>0){ scheduleSave(); return n; } }catch(_){ } if(looksLikeColumnBlocks(text)){ if(showAll){ alert('全科目では取込不可'); return 0; } const parsed=parseColumnBlocks(text); let applied=0; const col={date:'日付',type:'種別',goal:'目標',result:'結果',review:'復習'}; for(const o of parsed.rows){ const dtk=normalizeDateToken(o[col.date]); if(!dtk) continue; if(dtk.y!==year||dtk.mo!==month) continue; const ds=ymd(new Date(dtk.y,dtk.mo,dtk.d)); const rec=rows.find(x=>x.date===ds); if(!rec) continue; let t=clean(o[col.type]); if(t==='休み') t='休日'; if(/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; } rec.goal=clean(o[col.goal]); rec.result=clean(o[col.result]); rec.review=clean(o[col.review]); persist(rec); applied++; } if(applied) scheduleSave(); return applied; } return 0; }
-  async function ocrImage(file){ try{ const worker=await Tesseract.createWorker('jpn'); const {data:{text}}=await worker.recognize(file); await worker.terminate(); return text; } catch(e){ try{ const worker=await Tesseract.createWorker('eng'); const {data:{text}}=await worker.recognize(file); await worker.terminate(); return text; } catch(err){ throw e; } } }
+  /* ===== Import / OCR / Sheets ===== */
+  const normalizeDateToken=(raw)=>{
+    if(!raw) return null;
+    let s=String(raw).trim();
+    s=s.replace(/（.*?）|\(.*?\)/g,'');
+    s=s.replace(/[．。・‒–—―〜～]/g,'-');
+    let m=s.match(/^(\d{4})\s*[-/]\s*(\d{1,2})\s*[-/]\s*(\d{1,2})$/);
+    if(m) return {y:+m[1],mo:+m[2]-1,d:+m[3]};
+    m=s.match(/^(\d{1,2})\s*(?:\/|月)\s*(\d{1,2})/);
+    if(m){ const y=year; return {y,mo:+m[1]-1,d:+m[2]}; }
+    return null;
+  };
+  const clean=v=>{ const s=String(v??'').trim(); if(!s) return ''; if(/^(nan|null|undefined)$/i.test(s)) return ''; return s; };
+  const isTruthy=v=>{
+    const s=String(v??'').trim().toLowerCase();
+    return ['1','true','yes','y','t','完了','済','済み','done','○','◯'].includes(s);
+  };
+  function parseDelimited(text){
+    if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
+    const sep=(text.indexOf('\t')!==-1)?'\t':',';
+    const lines=text.replace(/\r\n?/g,'\n').split('\n').filter(l=>l.trim()!=='');
+    const header=lines[0].split(sep).map(s=>s.trim());
+    const rows=lines.slice(1).map(line=>{
+      const cells=line.split(sep);
+      const obj={}; header.forEach((h,i)=> obj[h]=(cells[i]??'').trim());
+      return obj;
+    });
+    return {header,rows};
+  }
+
+  // 汎用CSV取込（日付,種別,目標,結果,復習,完了 に対応／完了が無い場合は無視）
+  function importCsvText(text){
+    const {header,rows:objs}=parseDelimited(text);
+    const col={};
+    header.forEach(h=>{
+      if(/日付/.test(h)) col.date=h;
+      if(/種別/.test(h)) col.type=h;
+      if(/^目標(?:（科目名）)?$/.test(h)||/目標/.test(h)) col.goal=h;
+      if(/結果/.test(h)) col.result=h;
+      if(/復習/.test(h)) col.review=h;
+      if(/完了/.test(h)) col.done=h;
+    });
+    if(!col.date||!col.type){ alert('CSVの見出しに「日付」「種別」が必要です'); return 0; }
+    if(showAll){ alert('全科目ではCSV取込不可。科目を選んでください。'); return 0; }
+    let applied=0;
+    for(const o of objs){
+      const dtk=normalizeDateToken(o[col.date]); if(!dtk) continue;
+      if(dtk.y!==year||dtk.mo!==month) continue;
+      const ds=ymd(new Date(dtk.y,dtk.mo,dtk.d));
+      const rec=rows.find(x=>x.date===ds); if(!rec) continue;
+      let t=clean(o[col.type]); if(t==='休み') t='休日';
+      if(/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; }
+      if(col.goal!==undefined)   rec.goal   = clean(o[col.goal]);
+      if(col.result!==undefined) rec.result = clean(o[col.result]);
+      if(col.review!==undefined) rec.review = clean(o[col.review]);
+      if(col.done && clean(o[col.done])!==''){
+        rec.color = isTruthy(o[col.done]) ? 'gray' : 'normal';
+      }
+      persist(rec); applied++;
+    }
+    if(applied) scheduleSave();
+    return applied;
+  }
+
+  function looksLikeColumnBlocks(text){
+    const L=text.replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
+    if(L.length<12) return false;
+    const i=L.findIndex(s=>s.includes('日付'));
+    if(i<0||i+4>=L.length) return false;
+    const head=L.slice(i,i+5);
+    const need=['日付','種別','目標','結果','復習'];
+    if(!need.every((w,idx)=> (head[idx]||'').includes(w))) return false;
+    return L.slice(i+5).some(s=>/^\d{1,2}[\/\-月]\d{1,2}/.test(s)||/^\d{4}-\d{2}-\d{2}$/.test(s));
+  }
+  function parseColumnBlocks(text){
+    const L=text.replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
+    const i=L.findIndex(s=>s.includes('日付'));
+    const data=L.slice(i+5);
+    const rows=[]; let block={}; let ptr=0;
+    for(const line of data){
+      if(['日付','種別','目標','結果','復習','完了'].includes(line)) continue;
+      if(ptr===0){ block={}; block['日付']=line; ptr=1; continue; }
+      if(ptr===1){ block['種別']=line; ptr=2; continue; }
+      if(ptr===2){ block['目標']=line; ptr=3; continue; }
+      if(ptr===3){ block['結果']=line; ptr=4; continue; }
+      if(ptr===4){ block['復習']=line; ptr=5; continue; }
+      if(ptr===5){ block['完了']=line; rows.push(block); ptr=0; continue; }
+    }
+    if(ptr!==0){ block['目標']=block['目標']??''; block['結果']=block['結果']??''; block['復習']=block['復習']??''; rows.push(block); }
+    return {header:['日付','種別','目標','結果','復習','完了'], rows};
+  }
+  function importAnyText(text){
+    try{ const n=importCsvText(text); if(n>0){ scheduleSave(); return n; } }catch(_){}
+    if(looksLikeColumnBlocks(text)){
+      if(showAll){ alert('全科目では取込不可'); return 0; }
+      const parsed=parseColumnBlocks(text);
+      let applied=0; const col={date:'日付',type:'種別',goal:'目標',result:'結果',review:'復習',done:'完了'};
+      for(const o of parsed.rows){
+        const dtk=normalizeDateToken(o[col.date]); if(!dtk) continue;
+        if(dtk.y!==year||dtk.mo!==month) continue;
+        const ds=ymd(new Date(dtk.y,dtk.mo,dtk.d));
+        const rec=rows.find(x=>x.date===ds); if(!rec) continue;
+        let t=clean(o[col.type]); if(t==='休み') t='休日';
+        if(/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; }
+        rec.goal=clean(o[col.goal]); rec.result=clean(o[col.result]); rec.review=clean(o[col.review]);
+        if(o[col.done]!==undefined && clean(o[col.done])!==''){ rec.color = isTruthy(o[col.done])?'gray':'normal'; }
+        persist(rec); applied++;
+      }
+      if(applied) scheduleSave();
+      return applied;
+    }
+    return 0;
+  }
+
+  async function ocrImage(file){
+    try{
+      const worker=await Tesseract.createWorker('jpn'); const {data:{text}}=await worker.recognize(file);
+      await worker.terminate(); return text;
+    }catch(e){
+      try{ const worker=await Tesseract.createWorker('eng'); const {data:{text}}=await worker.recognize(file); await worker.terminate(); return text; }
+      catch(err){ throw e; }
+    }
+  }
+
+  // Google Sheets 取込（公開シートのCSVに対応）
+  async function importFromSheets(urlOrId){
+    try{
+      let url=String(urlOrId||'').trim();
+      if(!url) return 0;
+      if(/^[-\w]{20,}$/.test(url)){ // IDだけ渡された場合
+        url=`https://docs.google.com/spreadsheets/d/${url}/export?format=csv`;
+      }
+      const gidMatch=url.match(/[?&]gid=(\d+)/);
+      const hasGid = gidMatch? `&gid=${gidMatch[1]}`:'';
+      if(/\/edit(\?|#|$)/.test(url)) url=url.replace(/\/edit.*$/,'')+`/export?format=csv${hasGid}`;
+      if(/\/gviz\/tq/.test(url))     url=url.replace(/\/gviz\/tq.*$/,'')+`/export?format=csv${hasGid}`;
+      const res=await fetch(url,{mode:'cors'});
+      if(!res.ok) throw new Error('fetch failed');
+      const csv=await res.text();
+      const n=importCsvText(csv);
+      if(!n) alert('CSVは読み込めましたが当月データが見つかりませんでした');
+      return n;
+    }catch(_){
+      alert('Sheetsの読み込みに失敗しました。シートを「リンクを知っている全員に公開」にし、URLを貼ってください（/export?format=csv でも可）。');
+      return 0;
+    }
+  }
 
   /* ===== Points aggregation / Ranking ===== */
   function myMonthlyPoints(){
@@ -677,6 +830,8 @@
   function addDailyPoints(name, delta){ const all=loadDailyPoints(); const today=ymd(new Date()); if(!all[today]) all[today]={}; all[today][name]=(all[today][name]||0)+delta; saveDailyPoints(all); }
 
   let lastOrder=[];
+  let rankTimer=null, rankSpeedPct=100;
+
   function seedRand(seed){ let x=seed%2147483647; if(x<=0) x+=2147483646; return ()=> (x=x*16807%2147483647)/2147483647; }
   function classmatesMonthlyBase(){
     const seed=parseInt(`${year}${String(month+1).padStart(2,'0')}`);
@@ -707,11 +862,8 @@
       const delta = (was>=0) ? (was - i) : 0;
 
       const wrap=document.createElement('div'); wrap.className='rank-item';
-      if(delta>=9) wrap.classList.add('riseRed');
-      else if(delta>=7) wrap.classList.add('riseYellow');
-      else if(delta>=5) wrap.classList.add('riseGreen');
-      else if(delta>=3) wrap.classList.add('riseBlue');
-      else if(delta>=1) wrap.classList.add('risePink');
+      if(delta>0) wrap.classList.add('flash-up');
+      if(delta<0) wrap.classList.add('flash-down');
 
       const person = people.find(x=>x.name===p.name) || {profile:{},traits:{}};
       const title = `得意:${person.traits?.tokui||'-'} / 苦手:${person.traits?.nigate||'-'} / 性格:${person.traits?.seikaku||'-'}\n年齢:${person.profile?.age??'-'} / 浪数:${person.profile?.ron??0} / ${person.profile?.geneki?'現役':'既卒'} / ノルマ達成率:${person.profile?.quota??0}%`;
@@ -737,14 +889,8 @@
     });
     lastOrder = nowOrder;
 
-    rankGrid.querySelectorAll('input.inp-mini, select.sel-mini').forEach(el=>{
-      el.addEventListener('change',()=>{
-        const name=el.dataset.name; const key=el.dataset.k; const person=people.find(p=>p.name===name); if(!person) return;
-        if(key==='geneki'){ person.profile.geneki = (el.value==='1'); }
-        else{ person.profile[key] = Number(el.value)||0; }
-        savePeople(); renderRank();
-      });
-    });
+    // 右側一覧
+    const ol=$('#rankList'); if(ol){ ol.innerHTML=''; list.forEach((p,i)=>{ const li=document.createElement('li'); li.innerHTML=`<span>${i+1}. ${p.name}</span><span>${p.pts} pt</span>`; ol.appendChild(li); }); }
 
     const ticker=$('#rankTicker'); if(ticker) ticker.textContent='リアルタイム更新（〜18:00）稼働中';
   }
@@ -754,7 +900,7 @@
     const ticker=$('#rankTicker');
     if(hour>=18){ if(ticker) ticker.textContent='本日のライブ加点は終了（以降は翌日に反映）'; return; }
     const pool = people.filter(p=>p.name!==($('#displayName').value||'橋本淑雅'));
-    const nChanges=4;
+    const nChanges= Math.max(1, Math.round(4*rankSpeedPct/100)); // 速度に比例して変更回数UP
     for(let i=0;i<nChanges;i++){
       const w=pool.map(x=> (x.profile.quota||0)+10); const sum=w.reduce((a,b)=>a+b,0)||1;
       let r=Math.random()*sum, pick=pool[0];
@@ -765,7 +911,12 @@
     }
     renderRank();
   }
-  setInterval(rankLiveTick, 30000);
+  function startRankTimer(){
+    if(rankTimer){ clearInterval(rankTimer); rankTimer=null; }
+    const base=30000; // 30秒
+    const interval = Math.max(3000, Math.round(base * (100/rankSpeedPct))); // 速いほど短周期
+    rankTimer=setInterval(rankLiveTick, interval);
+  }
 
   /* ===== Classroom (page2) ===== */
   let classTicker=null; const lastSpokenAt=new Map(); let layoutMode='MFM';
@@ -776,7 +927,15 @@
   function baseTickMs(){ return Math.max(200,Math.round(800*factorFromBoost(getBoost()))); }
   function randomEmissionCount(){ const r=Math.random(); if(r<.15) return 0; if(r<.45) return 1; if(r<.8) return 2; if(r<.96) return 3; return 4; }
   function randomIsYell(){ return Math.random()<0.14; }
-  function lineFor(name){ const pool=getLinesFor(name); if(pool.length===0) return null; let msg=pool[(Math.random()*pool.length)|0]; return msg; }
+  function lineFor(name){
+    const me = ($('#displayName').value||'橋本淑雅').trim();
+    const pool=getLinesFor(name);
+    const amplified = (name===me)? pool.concat(pool).concat(pool) : pool; // 表示名を多めに
+    if(amplified.length===0) return null;
+    let msg=amplified[(Math.random()*amplified.length)|0];
+    if(msg.length<20) msg = msg + '。集中が続いている、その調子！';
+    return msg;
+  }
 
   function arrangeNamesMFM(){
     const males = people.filter(p=>!p.female).map(p=>p.name);
@@ -891,7 +1050,7 @@
     const female = confirm('女子ですか？（OK=女子／キャンセル=男子）');
     const np={ name, female, famous:false, profile:{age:null, ron:0, geneki:true, quota:50}, traits:{tokui:'',nigate:'',seikaku:'マイペース'} };
     people.push(np); savePeople();
-    customLines[name]=['一緒にがんばろう！']; saveCustomLines();
+    customLines[name]=makeDefaultLinesFor(np); saveCustomLines();
     renderEditPage();
   });
 
@@ -968,11 +1127,37 @@
     const me = saved || '橋本淑雅';
     $('#displayName').value = me;
     $('#meOnBoard') && ($('#meOnBoard').textContent = me);
+    if(!customLines[me] || customLines[me].length<20){
+      customLines[me]=[
+        `${me}さん、今日のノルマ消化が計画通りで素晴らしい。自分で自分を前に進めてる！`,
+        `${me}さんの解答プロセスが明確で、正解だけでなく再現性まで身についている。`,
+        `集中の入りが速い${me}さん、短時間でも密度が高いから成果が大きい。`,
+        `ミスの理由を言語化できている${me}さん、次に同じ所で止まらないのが強み。`,
+        `休むタイミングを調整できる${me}さん、体力管理が上手で長距離戦に強い。`,
+        `${me}さん、昨日より1問多く挑戦できた事実が、確実な伸びを物語っている。`,
+        `学習ログの粒度が細かい${me}さん、改善の根拠があるから伸びが速い。`,
+        `音読・書き出し・口頭説明の使い分けが絶妙、理解が立体的になっているよ。`,
+        `${me}さんの丁寧な見直し、ケアレスを点に換える上等な習慣だね。`,
+        `苦手分野にも真正面から向き合う姿勢が尊い。その勇気が実力になる。`,
+        `時間配分の修正が的確、余裕を作る判断ができるのはすでに強者の証。`,
+        `${me}さん、毎日の小さな完了が連なって、確かな自信になってきたね。`,
+        `似た問題の差を見抜ける観察眼が鋭い。得点力の源だよ。`,
+        `わからないを残さずメモへ送る運用、翌日の自分への最高のプレゼント。`,
+        `教材の選別がうまい${me}さん、必要な負荷だけを確実に積めている。`,
+        `今日の姿勢と視線が勝者のそれ。集中の質が段違いに良い。`,
+        `${me}さんのペース配分、長い時間でもバテずに質が落ちないのが本当にすごい。`,
+        `少しずつの前進を積む忍耐力、それが難関を抜ける唯一の道。君は歩けてる。`,
+        `できたの基準が高くなっている。レベルアップの証拠だよ。`,
+        `今日ここまで積み重ねた${me}さん、胸を張っていい。次の一歩も一緒にいこう。`
+      ];
+      saveCustomLines();
+    }
   })();
   $('#saveName')?.addEventListener('click',()=>{
     const me = ($('#displayName').value||'橋本淑雅').trim();
     localStorage.setItem(NAME_KEY, me);
     $('#meOnBoard') && ($('#meOnBoard').textContent = me);
+    if(!customLines[me] || customLines[me].length<20){ customLines[me]=makeDefaultLinesFor({name:me,traits:{},profile:{}}); saveCustomLines(); }
     renderRank();
   });
 
@@ -983,7 +1168,7 @@
   $('#tabEdit')?.addEventListener('click',()=>showPage('edit'));
   function setActiveTab(a,b,c,d){ $('#tabProgress').classList.toggle('active',a); $('#tabClass').classList.toggle('active',b); $('#tabRank').classList.toggle('active',c); $('#tabEdit').classList.toggle('active',d); }
   function showPage(which){
-    const p1=$('#pageProgress'), p2=$('#pageClass'), p3=$('#pageRank'), p4=$('#pageEdit');
+    const p1=$('#pageProgress'), p2=$('#pageClass'), p3=$('#pageRank'), p4=$('#pageEdit']);
     const show=(a,b)=>{ a.style.display='block'; b.forEach(x=>x.style.display='none'); };
     if(which==='progress'){ show(p1,[p2,p3,p4]); setActiveTab(true,false,false,false); stopClassTicker(); renderProgress(); }
     if(which==='class'){ show(p2,[p1,p3,p4]); setActiveTab(false,true,false,false); buildClassroom(); restartClassTicker(); }
@@ -995,33 +1180,34 @@
   $('#prev')?.addEventListener('click',()=>{ pushHistory(); flushAutoSave(); month-=1; if(month<0){month=11;year-=1;} reloadRows(); renderProgress(); renderRank(); });
   $('#next')?.addEventListener('click',()=>{ pushHistory(); flushAutoSave(); month+=1; if(month>11){month=0;year+=1;} reloadRows(); renderProgress(); renderRank(); });
 
-  // 保存/読込
+  // 保存/読込（読込＝ローカル保存の再読込）
   $('#save')?.addEventListener('click',()=>{ pushHistory(); flushAutoSave(); renderProgress(); renderRank(); alert('更新しました（この端末のブラウザ内）'); setTimeout(scrollTodayIntoView,0); });
   $('#load')?.addEventListener('click',()=>{ const ok=reloadRows(); renderProgress(); renderRank(); alert(ok?'読み込みました':'保存データが見つかりません'); });
 
-  // コンパクト
-  $('#toggleCompact')?.addEventListener('click',()=>{ document.body.classList.toggle('compact'); setTimeout(scrollTodayIntoView,0); });
-
-  // 取込
-  $('#importPaste')?.addEventListener('click',()=>{
+  // 取込UI
+  $('#btnPasteImport')?.addEventListener('click',()=>{
     if(showAll){ alert('全科目（一覧）では取込不可。科目を選んでください。'); return; }
-    const text=prompt('日付と種別の一覧や、縦一列の表を貼り付け'); if(!text) return;
-    pushHistory(); const n=parseTypeImport(text) || importAnyText(text); renderProgress(); renderRank();
+    const text=prompt('CSV/TSV/表の列を貼り付け（列: 日付, 種別, 目標, 結果, 復習, 完了※任意）');
+    if(!text) return;
+    pushHistory(); const n=importAnyText(text); renderProgress(); renderRank();
     alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした');
   });
-  $('#importFile')?.addEventListener('change',async (e)=>{
+  $('#fileImport')?.addEventListener('change',async (e)=>{
     if(showAll){ alert('全科目では取込不可'); e.target.value=''; return; }
     const f=e.target.files?.[0]; if(!f) return; const txt=await f.text();
     pushHistory(); const n=importAnyText(txt); renderProgress(); renderRank();
     alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした'); e.target.value='';
   });
-  $('#importImg')?.addEventListener('change',async (e)=>{
-    if(showAll){ alert('全科目では取込不可'); e.target.value=''; return; }
-    const f=e.target.files?.[0]; if(!f) return;
-    try{ const text=await ocrImage(f); pushHistory(); const n=importAnyText(text)||parseTypeImport(text||''); renderProgress(); renderRank(); alert(n?`OCR取込で当月に ${n} 件反映しました`:'文字が認識できないか当月データが見つかりませんでした'); }
-    catch(_){ alert('OCRに失敗しました'); }
-    finally{ e.target.value=''; }
+  $('#btnSheetsImport')?.addEventListener('click',async()=>{
+    if(showAll){ alert('全科目では取込不可'); return; }
+    const url=prompt('GoogleスプレッドシートのURLまたはID（※公開設定にしてください）');
+    if(!url) return;
+    pushHistory(); const n=await importFromSheets(url); renderProgress(); renderRank();
+    if(n) alert(`当月に ${n} 件反映しました`);
   });
+
+  // コンパクト
+  $('#toggleCompact')?.addEventListener('click',()=>{ document.body.classList.toggle('compact'); setTimeout(scrollTodayIntoView,0); });
 
   // Undo/Redo/全削除
   $('#undoP')?.addEventListener('click',()=>{ undo(); setTimeout(scrollTodayIntoView,0); });
@@ -1038,13 +1224,13 @@
   $('#wipeC')?.addEventListener('click',()=>{ if(confirm('Cページの発話状態をリセットしますか？')){ lastSpokenAt.clear(); buildClassroom(); } });
   $('#wipeT')?.addEventListener('click',()=>{ if(confirm('ランキング表示を再計算しますか？')){ renderRank(); } });
 
-  // 🐹＝ホーム＆今日へ
+  // 🐹＝ホーム＆今日へ（全ページで1ページ目に戻す）
   $('#fabHome')?.addEventListener('click',()=>{ showPage('progress'); setTimeout(scrollTodayIntoView,0); });
 
   // R＝強制リロード（キャッシュバイパス）
-  $('#reloadBtn')?.addEventListener('click',()=>{ const url = location.pathname + '?r=' + Date.now() + '&v=17.10'; location.replace(url); });
+  $('#reloadBtn')?.addEventListener('click',()=>{ const url = location.pathname + '?r=' + Date.now() + '&v=17.12'; location.replace(url); });
 
-  // Boost
+  // Boost（2ページ）
   (function initBoost(){
     const saved=localStorage.getItem(BOOST_KEY);
     const v=saved?Number(saved):0;
@@ -1068,6 +1254,9 @@
   function updateRuleNumbers(){ const rs=$('#ruleStudy'), rr=$('#ruleReview'), rh=$('#ruleHoliday'); if(rs) rs.textContent=pointsCfg.study; if(rr) rr.textContent=pointsCfg.review; if(rh) rh.textContent=pointsCfg.holiday; }
   $('#applyPts')?.addEventListener('click',()=>{ const ps=$('#ptStudy'), pr=$('#ptReview'), ph=$('#ptHoliday'); pointsCfg={ study:+(ps?.value||10), review:+(pr?.value||6), holiday:+(ph?.value||0) }; savePoints(); updateRuleNumbers(); renderRank(); });
 
+  // ランク速度
+  $('#rankSpeed')?.addEventListener('change',()=>{ const v=Number($('#rankSpeed').value)||100; rankSpeedPct=Math.max(10,Math.min(300,v)); startRankTimer(); });
+
   // 科目選択
   $('#addSubject')?.addEventListener('click',()=>{ const name=prompt('追加する科目名（例：英語）'); if(!name) return; const trimmed=name.trim(); if(!trimmed) return; if(subjects.includes(trimmed)){ alert('その科目はすでにあります'); return; } subjects.push(trimmed); saveSubjects(); renderSubjectSelect(); subject=trimmed; showAll=false; reloadRows(); renderProgress(); });
   $('#subjectSelect')?.addEventListener('change',e=>{ pushHistory(); subject=e.target.value; showAll=false; reloadRows(); renderProgress(); });
@@ -1082,14 +1271,12 @@
     const p4=$('#pageEdit')?.style.display!=='none';
     if(p1) renderProgress();
     if(p2){ buildClassroom(); restartClassTicker(); }
-    if(p3) renderRank();
+    if(p3){ renderRank(); startRankTimer(); }
     if(p4) renderEditPage();
-    // UI 初期値
     const theme=colorFor(subject); const cp=$('#colorPicker'), tr=$('#tintRange'); if(cp) cp.value=theme.hex; if(tr) tr.value=theme.tint;
     const dcp=$('#doneColorPicker'), dtr=$('#doneTintRange'); if(dcp) dcp.value=doneColor.hex; if(dtr) dtr.value=doneColor.tint;
     const ps=$('#ptStudy'), pr=$('#ptReview'), ph=$('#ptHoliday'); if(ps) ps.value=pointsCfg.study; if(pr) pr.value=pointsCfg.review; if(ph) ph.value=pointsCfg.holiday;
-    setSavedNow();
-    updateRuleNumbers();
+    setSavedNow(); updateRuleNumbers();
   }
   (function init(){ reloadRows(); renderAll(); document.body.classList.add('compact'); setTimeout(scrollTodayIntoView,0); })();
 
