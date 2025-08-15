@@ -8,16 +8,13 @@
 <style>
   :root{
     --line:#e5e7eb; --muted:#6b7280;
-    --today-bg:#005A9C; --today-text:#ffffff; /* Dodgersブルー(既存の今日色) */
-    --row-gray-bg:#b0a89f; --row-gray-text:#000000; /* ジャンガリア灰 */
+    --today-bg:#005A9C; --today-text:#ffffff;
+    --done-bg:#b0a89f; --done-text:#000000; /* ジャンガリア灰 */
     --header-bg:#ffffff; --header-shadow:0 6px 12px rgba(0,0,0,.06);
     --accent:#2563eb;
-
     --male:#2563eb; --female:#f97316;
-
     --bubble-gen-bg:#f4f8ff; --bubble-gen-bd:#d6e6ff;
     --bubble-fam-bg:#fff9ec; --bubble-fam-bd:#ffe5ad;
-
     --scale: 1;
   }
   *{box-sizing:border-box}
@@ -32,106 +29,111 @@
     border:1px solid var(--line);border-radius:12px;background:#fff;
     font-size:calc(16px*var(--scale));cursor:pointer
   }
-  textarea{width:100%;min-height:120px;resize:vertical;cursor:text}
+  input[type="text"], input[type="time"], textarea, select{width:100%; cursor:text}
+  textarea{min-height:120px;resize:vertical}
   input[type="number"]{width:7em}
-  input[type="color"]{padding:0;width:42px;height:42px;border-radius:10px}
   button.primary{background:var(--accent);border-color:#2563eb;color:#fff}
   .pill{border-radius:999px;padding:6px 10px;font-size:14px}
-  .ghost{background:#f8fafc}
+  .chip{border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-size:13px;background:#fff;cursor:pointer}
 
   .tabs{display:flex;gap:8px;margin:6px 0 10px}
   .tab{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:#fff;cursor:pointer}
   .tab.active{background:#eef2ff;border-color:#c7d2fe}
+
+  .pager{display:none} /* ← 戻る／進む（ページ移動）は非表示に */
 
   .today-banner{
     margin:6px 0 10px;padding:8px 12px;border:1px solid var(--line);
     border-radius:10px;background:#f8fafc;font-size:calc(14px*var(--scale))
   }
 
-  .tbl{width:100%;border:1px solid var(--line);border-radius:12px;overflow:auto;max-height:calc(84vh*var(--scale))}
+  .tbl{width:100%;border:1px solid var(--line);border-radius:12px;overflow:auto;max-height:calc(84vh*var(--scale));}
   table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
-  th,td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle;background:#fff}
+  th,td{padding:calc(8px*var(--scale));border-bottom:1px solid var(--line);vertical-align:top;background:#fff}
   th{
-    text-align:left;font-weight:600;font-size:calc(12px*var(--scale));color:var(--muted);
+    text-align:left;font-weight:700;font-size:calc(12px*var(--scale));color:#111;
     position:sticky;top:0;z-index:3;background:var(--header-bg);
-    border-bottom:2px solid var(--line);box-shadow:var(--header-shadow)
+    border-bottom:2px solid var(--line);box-shadow:var(--header-shadow);
   }
+  tr:hover td{background:#f9fafb}
   tr.today td{background:var(--today-bg)!important;color:var(--today-text)!important}
-  tr.manual-gray td{background:var(--row-gray-bg)!important;color:var(--row-gray-text)!important}
+  tr.done td{background:var(--done-bg)!important;color:var(--done-text)!important}
 
-  .type-wrap{display:flex;align-items:center;gap:8px}
-  .type-badge{font-weight:700;min-width:3.5em}
+  /* 列幅・揃え（ズレ解消） */
+  .col-date{width:160px}
+  .col-type{width:120px}
+  .col-goal,.col-result,.col-review{width:1fr}
+  .col-color{width:120px}
+  .col-donebtn{width:120px}
+  .cell{display:flex;align-items:center;gap:8px}
+  .cell input[type="text"]{width:100%}
+  .type-toggle{padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:12px;cursor:pointer}
 
-  /* 科目カラーの視認性を上げる（ボーダー＋淡い背景） */
-  tr.theme-row td{background-clip:padding-box}
-  tr.theme-row .theme-left{position:relative}
-  tr.theme-row .theme-left::before{
-    content:"";position:absolute;left:0;top:0;bottom:0;width:6px;border-radius:6px 0 0 6px;background:var(--theme-accent,#ddd)
-  }
+  /* subject color tint (濃淡) */
+  .tinted td{background:var(--tint) !important}
 
   .fab{
     position:fixed;z-index:5;width:54px;height:54px;border-radius:50%;
     display:flex;align-items:center;justify-content:center;border:1px solid var(--line);background:#fff;
-    box-shadow:0 10px 20px rgba(0,0,0,.12);user-select:none;right:14px;bottom:14px
+    box-shadow:0 10px 20px rgba(0,0,0,.12);user-select:none;-webkit-user-select:none;
+    right:14px;bottom:14px
   }
+  .fab:hover{transform:translateY(-1px)} .fab:active{transform:translateY(0)}
   .fab span{font-size:22px;line-height:1}
 
+  /* Classroom */
   .blackboard{border-radius:10px;border:2px solid #2f4f4f;background:#0f3b3f;color:#e0f2f1;padding:10px 12px;font-weight:600;margin-bottom:10px}
   .room{border:1px solid var(--line);border-radius:12px;padding:14px;background:#f7fafc;max-height:80vh;overflow:auto}
   .desks{display:grid;gap:10px;grid-template-columns:repeat(3, minmax(0,1fr))}
   .desk{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;min-height:100px;display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden}
   .desk .name{font-weight:700}
   .desk .role{font-size:12px;color:#6b7280}
-  .desk.male .name{color:var(--male)} .desk.female .name{color:var(--female)}
+  .desk.male .name{color:var(--male)}
+  .desk.female .name{color:var(--female)}
 
   .bubble{
-    position:absolute;left:6px;right:6px;top:6px;border:1px solid var(--bubble-gen-bd);background:var(--bubble-gen-bg);
-    border-radius:12px;padding:8px 10px;box-shadow:0 6px 12px rgba(0,0,0,.06);display:none;white-space:pre-line
+    position:absolute;left:8px;right:8px;top:8px;
+    border:1px solid var(--bubble-gen-bd);background:var(--bubble-gen-bg);
+    border-radius:12px;padding:10px 12px;font-size:14px;box-shadow:0 6px 12px rgba(0,0,0,.06);
+    display:none;max-width:unset;white-space:pre-line
   }
   .bubble::after{content:"";position:absolute;left:22px;bottom:-10px;border-width:10px 10px 0 10px;border-style:solid;border-color:var(--bubble-gen-bd) transparent transparent transparent}
   .bubble::before{content:"";position:absolute;left:22px;bottom:-9px;border-width:9px 9px 0 9px;border-style:solid;border-color:var(--bubble-gen-bg) transparent transparent transparent}
   .bubble.famous{background:var(--bubble-fam-bg);border-color:var(--bubble-fam-bd)}
   .bubble.famous::after{border-top-color:var(--bubble-fam-bd)}
   .bubble.famous::before{border-top-color:var(--bubble-fam-bg)}
-  .bubble.show{display:block;animation:fadeIn .12s ease}
-  .bubble.shout{transform:scale(1.06);font-size:18px}
+  .bubble.show{display:block;animation:fadeIn .15s ease}
+  .bubble.yell{font-size:22px;padding:16px 18px}
   @keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 
+  /* Rank */
   .rank-card{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff}
-  .rank-grid{column-width:260px;column-gap:16px}
+  .rank-rules{font-size:13px;color:#374151;background:#f9fafb;border:1px dashed #d1d5db;border-radius:8px;padding:8px;margin-bottom:8px}
+  .rank-grid{column-width:240px;column-gap:16px}
   .rank-item{break-inside:avoid;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0;background:#fff;display:block}
   .rank-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .rank-no{font-weight:800;min-width:3.5em}
-  .rank-up2{background:#ffe6f2} /* ピンク系＋2以上 */
-  .rank-up5{background:#e6f0ff;border-color:#bcd3ff} /* ブルー系＋5以上 */
+  .rise2{background:#ffe4ef} /* +2以上上昇でピンク */
+  .rise5{background:#e1effe} /* +5以上上昇でブルー */
 
   .ops{display:flex;gap:8px;align-items:center;margin:6px 0 10px}
 
-  /* Page4 editor */
+  /* Editor */
   .grid-edit{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
   .card{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff}
   .card h4{margin:0 0 6px}
   .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 
-  /* Timetable: クリックで開閉 */
-  .tt{margin-left:auto; position:relative}
-  .tt .pill{cursor:pointer}
-  .tt-panel{
-    position:absolute; right:0; top:42px; width:min(92vw,780px); max-height:72vh; overflow:auto;
-    border:1px solid var(--line); border-radius:12px; background:#fff; box-shadow:0 20px 40px rgba(0,0,0,.12);
-    opacity:0; transform:translateY(-6px) scale(.98); pointer-events:none; transition:opacity .18s ease, transform .18s ease; padding:10px;
-  }
-  .tt.open .tt-panel{opacity:1; transform:translateY(0) scale(1); pointer-events:auto}
+  /* Timetable modal */
+  .tt-wrap{margin-left:auto}
+  .tt-open{border:1px solid var(--line);border-radius:999px;background:#fff;padding:6px 10px}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:flex-start;justify-content:center;padding:24px;z-index:50}
+  .modal.show{display:flex}
+  .panel{width:min(96vw,820px);max-height:80vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 24px 48px rgba(0,0,0,.2);padding:12px}
   .tt-grid{display:grid;grid-template-columns:110px 1fr 1fr 1fr; gap:8px; align-items:center}
-  .tt-grid > div{padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:#fff}
+  .tt-grid > div, .tt-row > div{padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:#fff}
   .tt-row{display:contents}
-  .tt-actions{display:flex;gap:8px;align-items:center;margin:8px 0;flex-wrap:wrap}
   .linklike{color:var(--accent);text-decoration:underline;cursor:pointer}
-  .kbd{font-family:ui-monospace, SFMono-Regular, Menlo, monospace; background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:2px 6px}
-  .sep{height:1px;background:#e5e7eb;margin:8px 0}
-  /* 小さな本ボタン */
-  .book{border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:18px;background:#fff}
-  .book.active{background:#fffbeb;border-color:#f59e0b}
 </style>
 </head>
 <body>
@@ -153,8 +155,6 @@
     <button id="tabEdit" class="tab" title="セリフ編集">S 💬</button>
   </div>
 
-  <!-- 旧：ページ移動ボタンは削除 -->
-
   <!-- ===== Page 1: 進捗 ===== -->
   <section id="pageProgress" style="display:block">
     <div class="ops">
@@ -163,52 +163,32 @@
       <button id="wipeP">全削除</button>
     </div>
 
-    <!-- 科目切替 + 全科目（📚） + 科目カラー設定 + 時間割 -->
-    <div class="topbar" style="gap:12px; align-items:center; flex-wrap:wrap">
+    <!-- 科目切替 + 全科目（📚ボタン） + カラー + 時間割モーダル -->
+    <div class="topbar" style="gap:12px; align-items:center">
       <div class="row" style="gap:8px">
         <label class="muted">科目：</label>
-        <select id="subjectSelect"></select>
+        <select id="subjectSelect" style="width:auto"></select>
         <button id="addSubject">＋科目追加</button>
 
-        <button id="toggleAllBtn" class="book" title="全科目（一覧表示）">📚</button>
+        <button id="toggleAllBtn" class="chip" title="全科目（一覧）"><span id="allIcon">📚</span> 全科目</button>
       </div>
 
+      <!-- 🎨 カラー操作 -->
       <div class="row" style="gap:8px">
-        <span class="muted">行カラー：</span>
-        <button class="pill ghost" id="presetRedSox">RedSox</button>
-        <button class="pill ghost" id="presetBlueJays">BlueJays</button>
-        <button class="pill ghost" id="presetDodgers">Dodgers</button>
-        <button class="pill ghost" id="presetNL">All-Star NL</button>
-        <input type="color" id="customColor">
-        <input type="text" id="hexColor" placeholder="#RRGGBB" style="width:9em">
-        <label class="muted">濃淡</label><input type="range" id="tintRange" min="5" max="30" step="1" value="12" style="width:140px">
-        <button id="applyTheme" class="pill">適用</button>
+        <span class="muted">🎨 カラー：</span>
+        <button class="chip preset" data-preset="redsox">Red Sox</button>
+        <button class="chip preset" data-preset="bluejays">Blue Jays</button>
+        <button class="chip preset" data-preset="dodgers">Dodgers</button>
+        <button class="chip preset" data-preset="nl">NL All-Star</button>
+        <input id="colorPicker" type="text" placeholder="#RRGGBB" style="width:9em">
+        <label class="muted">濃淡</label>
+        <input id="tintRange" type="range" min="0" max="90" value="18" style="width:140px">
+        <button id="applyColor" class="chip">適用</button>
       </div>
 
-      <div class="tt" id="ttBox">
-        <span id="ttToggle" class="pill">🗓 時間割（クリックで開く）</span>
-        <div class="tt-panel">
-          <div class="row tt-actions">
-            <strong id="ttTitle">今日の時間割</strong>
-            <button id="ttAddRow">＋行追加</button>
-            <button id="ttShuffle20">🔀 自動提案(20)</button>
-            <span class="muted">← / → で切替</span>
-            <button id="ttAdopt" class="pill">採用</button>
-            <button id="ttClose" class="pill ghost">閉じる</button>
-          </div>
-          <div id="ttPreview" class="muted" style="margin:4px 0 8px"></div>
-          <div class="sep"></div>
-          <div class="tt-grid">
-            <div class="muted">開始</div>
-            <div class="muted">終了</div>
-            <div class="muted">内容</div>
-            <div class="muted">操作</div>
-          </div>
-          <div id="ttRows"></div>
-          <div class="muted" style="margin-top:8px">
-            ヒント：<span class="kbd">↑↓</span>で行移動、<span class="kbd">←→</span>で列移動。入力はオートセーブ。
-          </div>
-        </div>
+      <!-- 🗓 時間割 -->
+      <div class="tt-wrap">
+        <button id="ttOpen" class="tt-open">🗓 時間割を開く</button>
       </div>
     </div>
 
@@ -240,12 +220,13 @@
       <table>
         <thead>
           <tr id="theadRow">
-            <th class="medium theme-left">日付</th>
-            <th class="small">種別</th>
-            <th class="medium">目標（科目名）</th>
-            <th class="medium">結果</th>
-            <th class="medium">復習</th>
-            <th class="small">色</th>
+            <th class="col-date">日付</th>
+            <th class="col-type">種別</th>
+            <th class="col-goal">目標（科目名）</th>
+            <th class="col-result">結果</th>
+            <th class="col-review">復習</th>
+            <th class="col-color">色</th>
+            <th class="col-donebtn">完了</th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -259,18 +240,17 @@
       <button id="undoC">戻る</button>
       <button id="redoC">進む</button>
       <button id="wipeC">全削除</button>
-      <button id="shuffleSeats">席替え</button>
+      <button id="shuffleSeat" class="chip">🔀 席替え</button>
+      <button id="toggleLayout" class="chip">M/F/M 整列</button>
     </div>
     <div class="blackboard">
       1年B組 – クラスメートが「<span id="meOnBoard">橋本淑雅</span>」を応援中！
       <span style="margin-left:10px" class="muted">速さ%増し：</span>
-      <input id="boostInput" type="number" min="0" step="1" value="0" title="例: 13 → 13%速く">
+      <input id="boostInput" type="number" min="0" step="1" value="0" title="例: 13 → 13%速く" style="width:8em">
       <button id="applyBoost">適用</button>
       <span id="boostHint" class="muted"></span>
     </div>
-    <div class="room">
-      <div class="desks" id="desks"></div>
-    </div>
+    <div class="room"><div class="desks" id="desks"></div></div>
   </section>
 
   <!-- ===== Page 3: ランキング ===== -->
@@ -281,13 +261,16 @@
       <button id="wipeT">全削除</button>
     </div>
     <div class="rank-card">
-      <h3>今月の順位（合計ポイント）</h3>
-      <div class="muted" style="margin:6px 0 10px; line-height:1.6">
-        ルール：<strong>完了=+10</strong>（学習）／<strong>完了=+6</strong>（復習）／休日=0。<br>
-        ライブ増減：<span class="muted">16時〜18時は「在学組」が伸びやすい／午前〜15時は「浪人組」優勢。<strong>18時で当日分を締め</strong>、以降は翌日に反映。</span><br>
-        演出：前日から<strong>+2位</strong>以上→<span style="background:#ffe6f2;border-radius:4px;padding:0 6px">ピンク</span>、<strong>+5位</strong>以上→<span style="background:#e6f0ff;border-radius:4px;padding:0 6px">青</span>。がんばり組は教室でも励まし発言が増えます。
+      <div class="rank-rules" id="rankRules">
+        <strong>ポイントのルール</strong><br>
+        ・当日「完了（灰色）」にした学習… +10 / 復習… +6（「休日」は +0）<br>
+        ・本日のリアルタイム加点は <strong>18:00</strong> まで（以降は翌日に繰越）<br>
+        ・学校勢は 16–18時に加点が伸びやすい／浪人・独学勢は午前～15時も伸びやすい（疑似）<br>
+        ・不正防止のため乱数ベース、毎日ゆらぎます
       </div>
+      <h3>今月の順位（合計ポイント）</h3>
       <div id="rankGrid" class="rank-grid"></div>
+      <div id="rankTicker" class="muted" style="margin-top:6px">…更新中</div>
     </div>
   </section>
 
@@ -296,8 +279,8 @@
     <div class="ops">
       <button id="undoS">戻る</button>
       <button id="redoS">進む</button>
-      <button id="wipeS">全消去</button>
-      <span class="muted">各人：1行=1セリフ（空欄=ミュート）／停止0.6秒で自動保存</span>
+      <span class="muted">各人：1行=1セリフ。空欄でミュート</span>
+      <span class="muted">（自動保存：入力停止0.6秒）</span>
       <button id="exportLines">💾 書き出し</button>
       <label>
         <input id="importLinesFile" type="file" accept=".json" style="display:none">
@@ -307,37 +290,125 @@
     <div class="grid-edit" id="editGrid"></div>
   </section>
 
+  <!-- 時間割モーダル -->
+  <div id="ttModal" class="modal" aria-hidden="true">
+    <div class="panel">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <strong id="ttTitle">今日の時間割</strong>
+        <div class="row" style="gap:8px">
+          <button id="ttAddRow" class="chip">＋行追加</button>
+          <button id="ttSuggest" class="chip">🔀 自動提案（20件）</button>
+          <button id="ttClose" class="chip">閉じる ✕</button>
+        </div>
+      </div>
+      <div class="tt-grid" style="margin-top:8px">
+        <div class="muted">開始</div>
+        <div class="muted">終了</div>
+        <div class="muted">内容</div>
+        <div class="muted">操作</div>
+      </div>
+      <div id="ttRows"></div>
+      <div id="ttSuggestBar" class="row" style="gap:10px; align-items:center; margin-top:10px; display:none">
+        <button id="ttPrev" class="chip">◀ 前</button>
+        <span id="ttIndex" class="muted">1 / 20</span>
+        <button id="ttNext" class="chip">次 ▶</button>
+        <button id="ttApply" class="chip">✅ 採用</button>
+      </div>
+      <div class="muted" style="margin-top:8px">ヒント：入力は即保存／提案を採用してから微調整可能</div>
+    </div>
+  </div>
+
   <button class="fab" id="fabHome" title="ホームへ"><span>🐹</span></button>
 
 <script>
 (function(){
   'use strict';
 
-  /* ====== Keys ====== */
-  const KEY='studyplanner.v16.ocr';
+  /* ===================== Keys ===================== */
+  const KEY='studyplanner.v16';
   const NAME_KEY='studyplanner.displayName';
   const LINES_KEY='studyplanner.v16.lines';
   const BOOST_KEY='studyplanner.v16.classBoost';
   const SUBJ_KEY='studyplanner.v16.subjects';
-  const THEME_KEY='studyplanner.v16.theme'; // {subject:{hex,tint}}
-  const TT_KEY='studyplanner.v16.tt';
-  const RANK_LIVE_KEY='studyplanner.v16.rank.live'; // {yyyymmdd:{name:delta}}
-  const RANK_PREV_KEY='studyplanner.v16.rank.prev'; // {yyyymmdd:[name order]}
+  const COLOR_KEY='studyplanner.v16.subjectColors';
+  const TT_KEY='studyplanner.v16.tt';   // 時間割（科目別）
+  const DP_KEY='studyplanner.v16.dailyPoints'; // 日別ポイント（ランキング揺らぎ）
 
+  /* ===================== State ===================== */
   let year=(new Date()).getFullYear(), month=(new Date()).getMonth();
-  let rows=[];
+  let rows=[];            // 表示・編集中の配列（科目 or 全科目合成）
   let subjects = loadSubjects();
   let subject = subjects[0] || '世界史';
-  let showAll = false;
+  let showAll = false;    // 全科目（一覧）
+  let subjectColors = loadSubjectColors(); // subj -> {hex, tint}
 
-  /* ======= Auto Save (Page1) ======= */
-  const AUTOSAVE_MS = 800;
-  let autoSaveTimer = null;
+  // Undo/Redo（4ページも含めスナップショット）
+  const history = { past:[], future:[] };
+  const snapshot = () => JSON.parse(JSON.stringify({
+    year,month,rows,subject,showAll, subjectColors, customLines
+  }));
+  const pushHistory = () => { history.past.push(snapshot()); history.future.length=0; };
+  function undo(){ if(!history.past.length) return; const cur=snapshot(); const prev=history.past.pop(); history.future.push(cur); Object.assign(window, prev); renderAll(); }
+  function redo(){ if(!history.future.length) return; const cur=snapshot(); const nxt=history.future.pop(); history.past.push(cur); Object.assign(window, nxt); renderAll(); }
+
+  /* ===================== Utils ===================== */
+  const $=sel=>document.querySelector(sel);
+  const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const fromYmd=s=>{const [y,m,d]=s.split('-').map(Number); return new Date(y, m-1, d);};
+  const jpWeek=d=>'日月火水木金土'[d.getDay()];
+  const jpDateLabel=s=>{const d=fromYmd(s);return `${d.getMonth()+1}月${d.getDate()}日(${jpWeek(d)})`;};
+  function monthDates(y,m){const first=new Date(y,m,1), last=new Date(y,m+1,0), arr=[]; for(let d=new Date(first); d<=last; d.setDate(d.getDate()+1)) arr.push(ymd(d)); return arr;}
+  function ensureScaffoldFor(arr){
+    const need=new Set(monthDates(year,month));
+    const have=new Set(arr.map(r=>r.date));
+    need.forEach(d=>{ if(!have.has(d)) arr.push({date:d, type:'学習', goal:'', result:'', review:'', color:'normal'}); });
+    arr.sort((a,b)=>a.date.localeCompare(b.date));
+  }
+  function persist(rec){
+    const i=rows.findIndex(x=>x.date===rec.date && (showAll? (x._subject===rec._subject):true));
+    if(i>=0) rows[i]=rec; else rows.push(rec);
+  }
+  function stripSubject(r){ const { _subject, ...rest } = r; return rest; }
+
+  /* ===================== Subjects & Colors ===================== */
+  function loadSubjects(){
+    try{ const raw=localStorage.getItem(SUBJ_KEY); const arr = raw? JSON.parse(raw): null; return (Array.isArray(arr)&&arr.length)?arr:['世界史','英語','数学']; }
+    catch(_){ return ['世界史','英語','数学']; }
+  }
+  function saveSubjects(){ try{ localStorage.setItem(SUBJ_KEY, JSON.stringify(subjects)); }catch(_){} }
+  function renderSubjectSelect(){
+    const sel = $('#subjectSelect'); sel.innerHTML='';
+    subjects.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; sel.appendChild(o); });
+    if(!subjects.includes(subject)) subject=subjects[0];
+    sel.value=subject;
+  }
+  function loadSubjectColors(){
+    try{ const raw=localStorage.getItem(COLOR_KEY); return raw? JSON.parse(raw): {}; }catch(_){ return {}; }
+  }
+  function saveSubjectColors(){ try{ localStorage.setItem(COLOR_KEY, JSON.stringify(subjectColors)); }catch(_){} }
+  function colorFor(subj){
+    const c = subjectColors[subj];
+    if(c && c.hex){ const tint = Math.max(0, Math.min(90, c.tint ?? 18)); return {hex:c.hex, tint}; }
+    // 既定（科目名で軽く振り分け）
+    if(/英語/.test(subj)) return {hex:'#BD3039', tint:18};       // Red Sox レッド
+    if(/数学/.test(subj)) return {hex:'#134A8E', tint:18};       // Blue Jays ブルー
+    if(/世界史/.test(subj)) return {hex:'#005A9C', tint:14};     // Dodgers ネイビー寄り
+    return {hex:'#2563eb', tint:12};
+  }
+  function tintCss(hex, percent){
+    // hex -> rgba風で薄め背景
+    const m = hex.replace('#','');
+    const r=parseInt(m.slice(0,2),16), g=parseInt(m.slice(2,4),16), b=parseInt(m.slice(4,6),16);
+    const a = Math.max(0, Math.min(1, percent/100));
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  /* ===================== Storage for Month ===================== */
+  const AUTOSAVE_MS=800; let autoSaveTimer=null;
   const currentKey = (s=subject)=> `${KEY}:${s}:${year}-${String(month+1).padStart(2,'0')}`;
   function doSaveToLocal(s=subject, dataRows=rows){
     const data=dataRows.filter(r=>{
-      const d=fromYmd(r.date);
-      return d.getMonth()===month && d.getFullYear()===year;
+      const d=fromYmd(r.date); return d.getMonth()===month && d.getFullYear()===year;
     });
     try{ localStorage.setItem(currentKey(s), JSON.stringify(data)); }catch(_){}
   }
@@ -374,91 +445,10 @@
   }
   window.addEventListener('beforeunload', flushAutoSave);
 
-  /* ====== Undo/Redo for pages ====== */
-  const history = { past:[], future:[] };
-  const snapshot = () => JSON.parse(JSON.stringify({year,month,rows,subject,showAll, themes:loadThemes(), customLines}));
-  const pushHistory = () => { history.past.push(snapshot()); history.future.length=0; };
-  function undo(){ if(!history.past.length) return; const cur=snapshot(); const prev=history.past.pop(); history.future.push(cur); restore(prev); }
-  function redo(){ if(!history.future.length) return; const cur=snapshot(); const nxt=history.future.pop(); history.past.push(cur); restore(nxt); }
-  function restore(state){
-    ({year,month,rows,subject,showAll}=state);
-    saveThemes(state.themes||{});
-    customLines = state.customLines||customLines;
-    renderAll();
-  }
-
-  /* ====== Utils ====== */
-  const $=sel=>document.querySelector(sel);
-  const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-  const fromYmd=s=>{const [y,m,d]=s.split('-').map(Number); return new Date(y, m-1, d);};
-  const jpWeek=d=>'日月火水木金土'[d.getDay()];
-  const jpDateLabel=s=>{const d=fromYmd(s);return `${d.getMonth()+1}月${d.getDate()}日(${jpWeek(d)})`;};
-  function monthDates(y,m){const first=new Date(y,m,1), last=new Date(y,m+1,0), arr=[]; for(let d=new Date(first); d<=last; d.setDate(d.getDate()+1)) arr.push(ymd(d)); return arr;}
-  function ensureScaffoldFor(arr){
-    const need=new Set(monthDates(year,month));
-    const have=new Set(arr.map(r=>r.date));
-    need.forEach(d=>{ if(!have.has(d)) arr.push({date:d, type:'学習', goal:'', result:'', review:'', color:'normal'}); });
-    arr.sort((a,b)=>a.date.localeCompare(b.date));
-  }
-  function persist(rec){const i=rows.findIndex(x=>x.date===rec.date && (showAll? (x._subject===rec._subject):true)); if(i>=0) rows[i]=rec; else rows.push(rec);}
-  function stripSubject(r){ const { _subject, ...rest } = r; return rest; }
-  function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
-
-  /* ====== Subjects ====== */
-  function loadSubjects(){
-    try{
-      const raw=localStorage.getItem(SUBJ_KEY);
-      let arr = raw? JSON.parse(raw): null;
-      if(!Array.isArray(arr) || arr.length===0) arr=['世界史','英語','数学'];
-      return arr;
-    }catch(_){ return ['世界史','英語','数学']; }
-  }
-  function saveSubjects(){ try{ localStorage.setItem(SUBJ_KEY, JSON.stringify(subjects)); }catch(_){} }
-  function renderSubjectSelect(){
-    const sel = $('#subjectSelect'); sel.innerHTML='';
-    subjects.forEach(s=>{
-      const o=document.createElement('option'); o.value=s; o.textContent=s; sel.appendChild(o);
-    });
-    if(!subjects.includes(subject)) subject=subjects[0];
-    sel.value=subject;
-  }
-
-  /* ====== Themes (MLB等) ====== */
-  const PRESETS = {
-    RedSox:   { hex:'#BD3039', accent:'#0D2B56' },
-    BlueJays: { hex:'#134A8E', accent:'#1D2D5C' },
-    Dodgers:  { hex:'#005A9C', accent:'#EF3E42' },
-    NL:       { hex:'#13294B', accent:'#C8102E' } // NLオールスターっぽい紺＋赤
-  };
-  function loadThemes(){ try{ return JSON.parse(localStorage.getItem(THEME_KEY)||'{}'); }catch(_){ return {}; } }
-  function saveThemes(o){ try{ localStorage.setItem(THEME_KEY, JSON.stringify(o)); }catch(_){} }
-  function themeFor(subj){
-    const all = loadThemes();
-    if(all[subj]) return all[subj];
-    // 既定：英語→RedSox、数学→BlueJays、世界史→Dodgers
-    if(subj==='英語') return {hex:PRESETS.RedSox.hex, accent:PRESETS.RedSox.accent, tint:12};
-    if(subj==='数学') return {hex:PRESETS.BlueJays.hex, accent:PRESETS.BlueJays.accent, tint:12};
-    if(subj==='世界史') return {hex:PRESETS.Dodgers.hex, accent:PRESETS.Dodgers.accent, tint:12};
-    return {hex:'#2d3748', accent:'#1a202c', tint:12};
-  }
-  function setTheme(subj, cfg){ const all=loadThemes(); all[subj]=cfg; saveThemes(all); }
-
-  function hexToRgb(hex){
-    const h=hex.replace('#','').trim(); if(h.length!==6) return {r:45,g:55,b:72};
-    return { r:parseInt(h.slice(0,2),16), g:parseInt(h.slice(2,4),16), b:parseInt(h.slice(4,6),16) };
-  }
-  function rgba(hex,alpha){
-    const {r,g,b}=hexToRgb(hex); return `rgba(${r},${g},${b},${alpha})`;
-  }
-
-  /* ====== Page1 Save/Load ====== */
-  function save(){ pushHistory(); flushAutoSave(); alert('更新しました（この端末のブラウザ内）'); renderRank(); scrollTodayIntoView(); }
   function loadSubjectMonth(s=subject){
-    const raw=localStorage.getItem(currentKey(s));
-    let arr=[];
-    if(raw){ try{ arr = JSON.parse(raw)||[]; }catch(_{}); }
-    ensureScaffoldFor(arr);
-    return arr;
+    const raw=localStorage.getItem(currentKey(s)); let arr=[];
+    if(raw){ try{ arr = JSON.parse(raw)||[]; }catch(_){ } }
+    ensureScaffoldFor(arr); return arr;
   }
   function load(){
     if(showAll){
@@ -475,35 +465,25 @@
     }
   }
 
-  /* ====== Page1 Render ====== */
+  /* ===================== Page1 Render ===================== */
   function renderProgress(){
     load();
     const days = monthDates(year,month).length;
     $('#label').textContent = showAll? `全科目 ${year}年${month+1}月（${days}日）` : `${subject} — ${year}年${month+1}月（${days}日）`;
-
-    // ヘッダー
-    const thead = $('#theadRow'); thead.innerHTML='';
-    if(showAll){
-      thead.innerHTML = `
-        <th class="theme-left small">科目</th>
-        <th class="medium">日付</th>
-        <th class="small">種別</th>
-        <th class="medium">目標（科目名）</th>
-        <th class="medium">結果</th>
-        <th class="medium">復習</th>
-        <th class="small">色</th>`;
-    }else{
-      thead.innerHTML = `
-        <th class="theme-left medium">日付</th>
-        <th class="small">種別</th>
-        <th class="medium">目標（科目名）</th>
-        <th class="medium">結果</th>
-        <th class="medium">復習</th>
-        <th class="small">色</th>`;
-    }
+    const thead = $('#theadRow');
+    thead.innerHTML = `
+      <th class="col-date">日付</th>
+      <th class="col-type">種別</th>
+      <th class="col-goal">目標（科目名）</th>
+      <th class="col-result">結果</th>
+      <th class="col-review">復習</th>
+      <th class="col-color">色</th>
+      <th class="col-donebtn">完了</th>`;
 
     const tb=$('#tbody'); tb.innerHTML='';
     const todayStr=ymd(new Date());
+
+    // 表示リスト
     let list=[];
     if(showAll){
       const needDays=monthDates(year,month);
@@ -518,130 +498,112 @@
       list = rows.slice();
     }
 
-    list.forEach((r,rowIdx)=>{
+    // 科目色
+    const subjColor = colorFor(subject);
+    const tintBg = tintCss(subjColor.hex, subjColor.tint);
+
+    list.forEach((r,rowIndex)=>{
       const tr=document.createElement('tr');
-      tr.dataset.date=r.date;
-      if(r.color==='gray') tr.classList.add('manual-gray');
-      else if(r.date===todayStr) tr.classList.add('today');
+      if(r.color==='gray' || r.type==='休日') tr.classList.add('done');
+      if(r.date===todayStr) tr.classList.add('today');
+      if(!showAll){ tr.classList.add('tinted'); tr.style.setProperty('--tint', tintBg); }
 
-      // テーマ色（科目別）適用
-      const sub = showAll ? (r._subject||subject) : subject;
-      const thm = themeFor(sub);
-      if(r.color!=='gray'){
-        tr.classList.add('theme-row');
-        const bg = rgba(thm.hex, clamp((thm.tint||12)/100, 0.04, 0.35));
-        tr.style.setProperty('--theme-accent', thm.accent||thm.hex);
-        Array.from(tr.children).forEach(()=>{});
-        tr.style.background=bg;
-      }else{
-        tr.style.background='';
-      }
+      // 各セル
+      const tdDate = document.createElement('td'); tdDate.innerHTML = `<div class="cell">${jpDateLabel(r.date)}</div>`;
+      const tdType = document.createElement('td');
+      const typeBadge = (r.type==='休日')?'休日':(r.type==='復習'?'復習':'学習');
+      tdType.innerHTML = `<div class="cell"><span class="muted">${typeBadge}</span><button class="type-toggle">${r.type==='休日'?'学習にする':'休日にする'}</button></div>`;
 
-      function makeInputCell(value, placeholder, colName){
-        const td=document.createElement('td'); td.className='';
-        const inp=document.createElement('input'); inp.type='text'; inp.placeholder=placeholder; inp.value=value||''; inp.dataset.col=colName; inp.dataset.row=rowIdx;
-        attachNavHandlers(inp);
-        inp.addEventListener('input',e=>{ pushHistory(); r[colName]=e.target.value; persist(r); touch(); });
-        td.appendChild(inp); return td;
-      }
+      const tdGoal=document.createElement('td');
+      const inGoal=document.createElement('input'); inGoal.type='text'; inGoal.placeholder='例：世界史 23〜24'; inGoal.value=r.goal||'';
+      tdGoal.appendChild(inGoal);
 
-      // 列
-      if(showAll){ const tdSub=document.createElement('td'); tdSub.textContent=sub; tdSub.className='theme-left'; tr.appendChild(tdSub); }
+      const tdRes=document.createElement('td');
+      const inRes=document.createElement('input'); inRes.type='text'; inRes.placeholder='実績'; inRes.value=r.result||'';
+      tdRes.appendChild(inRes);
 
-      const tdDate=document.createElement('td'); tdDate.textContent=jpDateLabel(r.date); tdDate.className='theme-left'; tr.appendChild(tdDate);
-
-      const tdType=document.createElement('td');
-      const wrap=document.createElement('div'); wrap.className='type-wrap';
-      const badge=document.createElement('span'); badge.className='type-badge'; badge.textContent=(r.type==='休日')?'休日':(r.type==='復習'?'復習':'学習');
-      const btn=document.createElement('button'); btn.className='type-toggle'; btn.type='button'; btn.textContent=(r.type==='休日')?'学習にする':'休日にする';
-      btn.addEventListener('click',()=>{
-        pushHistory();
-        r.type=(r.type==='休日')?'学習':'休日';
-        // 休日は自動でジャンガリア灰色（ポイント加算なし）
-        if(r.type==='休日'){ r.color='gray'; }
-        persist(r); touch(); renderProgress(); renderRank(); scrollTodayIntoView();
-      });
-      wrap.appendChild(badge); wrap.appendChild(btn); tdType.appendChild(wrap); tr.appendChild(tdType);
-
-      tr.appendChild(makeInputCell(r.goal,'例：世界史 23〜24','goal'));
-      tr.appendChild(makeInputCell(r.result,'実績','result'));
-      tr.appendChild(makeInputCell(r.review,'復習範囲','review'));
+      const tdRev=document.createElement('td');
+      const inRev=document.createElement('input'); inRev.type='text'; inRev.placeholder='復習範囲'; inRev.value=r.review||'';
+      tdRev.appendChild(inRev);
 
       const tdClr=document.createElement('td');
-      const sel=document.createElement('select'); sel.dataset.col='color'; sel.dataset.row=rowIdx;
+      const selClr=document.createElement('select');
       [{v:'normal',t:'通常'}, {v:'gray',t:'完了'}].forEach(p=>{
-        const o=document.createElement('option'); o.value=p.v; o.textContent=p.t; if((r.color||'normal')===p.v) o.selected=true; sel.appendChild(o);
+        const o=document.createElement('option'); o.value=p.v; o.textContent=p.t; if((r.color||'normal')===p.v) o.selected=true; selClr.appendChild(o);
       });
-      attachNavHandlers(sel);
-      sel.addEventListener('change',e=>{
-        pushHistory();
-        r.color=e.target.value;
-        // 完了にしたら今日へスクロール＋再計算（ポイント入る/復習は+6）
-        persist(r); touch(); renderProgress(); renderRank(); scrollTodayIntoView();
-      });
-      tdClr.appendChild(sel); tr.appendChild(tdClr);
+      tdClr.appendChild(selClr);
 
+      const tdDone=document.createElement('td');
+      const btnDone=document.createElement('button'); btnDone.className='chip'; btnDone.textContent='✅ 完了';
+      tdDone.appendChild(btnDone);
+
+      // クリック系
+      tdType.querySelector('.type-toggle').addEventListener('click',()=>{
+        pushHistory();
+        r.type = (r.type==='休日')?'学習':'休日';
+        if(r.type==='休日'){ r.color='gray'; } // 休日は灰色＆ポイント付与なし扱い
+        persist(r); touch(); renderProgress(); scrollTodayIntoView();
+      });
+      selClr.addEventListener('change',e=>{
+        pushHistory(); r.color=e.target.value; if(r.color==='gray'){ /* 完了時のみポイント対象 */ }
+        persist(r); touch(); renderProgress(); scrollTodayIntoView();
+      });
+      btnDone.addEventListener('click',()=>{
+        pushHistory();
+        r.color='gray'; // 完了＝灰色
+        if(r.type==='休日'){ r.type='休日'; } // 休日は+0、学習/復習は月次集計で加点
+        persist(r); touch(); renderProgress(); scrollTodayIntoView();
+      });
+
+      // 入力変更
+      const onInput=(field)=> (e)=>{ pushHistory(); r[field]=e.target.value; persist(r); touch(); };
+      inGoal.addEventListener('input', onInput('goal'));
+      inRes .addEventListener('input', onInput('result'));
+      inRev .addEventListener('input', onInput('review'));
+
+      // 矢印キー移動
+      [inGoal,inRes,inRev,selClr,btnDone].forEach((el,colIndex)=>{
+        el.dataset.rowIndex=rowIndex; el.dataset.colIndex=colIndex; // 0..4
+        el.addEventListener('keydown', (ev)=>{
+          const rIdx = +el.dataset.rowIndex, cIdx = +el.dataset.colIndex;
+          let nr=rIdx, nc=cIdx;
+          if(ev.key==='ArrowDown'){ nr=rIdx+1; }
+          if(ev.key==='ArrowUp'){ nr=rIdx-1; }
+          if(ev.key==='ArrowRight'){ nc=cIdx+1; }
+          if(ev.key==='ArrowLeft'){ nc=cIdx-1; }
+          if(ev.key==='Enter'){ nr=rIdx+1; }
+          if(nr!==rIdx || nc!==cIdx){
+            ev.preventDefault();
+            const q=`[data-row-index="${nr}"][data-col-index="${nc}"]`;
+            const next=tb.querySelector(q);
+            if(next){ next.focus(); if(next.select) next.select(); }
+          }
+        });
+      });
+
+      tr.appendChild(tdDate); tr.appendChild(tdType); tr.appendChild(tdGoal);
+      tr.appendChild(tdRes); tr.appendChild(tdRev); tr.appendChild(tdClr); tr.appendChild(tdDone);
       tb.appendChild(tr);
     });
 
-    // 今日表示バナー
     const t=new Date();
     $('#todayBanner').textContent=`本日: ${t.getMonth()+1}月${t.getDate()}日(${jpWeek(t)})`;
-
-    // 科目テーマコントロールの表示更新
-    const thm = themeFor(subject);
-    $('#customColor').value = thm.hex;
-    $('#hexColor').value = thm.hex;
-    $('#tintRange').value = thm.tint||12;
-
     scrollTodayIntoView();
-    renderTimetable();
+    renderTimetable(); // 科目に応じて
+    highlightAllToggle();
   }
 
   function scrollTodayIntoView(){
     const scroller=$('#scroller'); if(!scroller) return;
-    const todayRow=scroller.querySelector('tr.today'); if(!todayRow) return;
-    scroller.scrollTo({top:Math.max(0,todayRow.offsetTop-60), behavior:'instant'});
+    const thead=scroller.querySelector('thead'); const todayRow=scroller.querySelector('tr.today');
+    if(!todayRow || !thead) return; const headerH=thead.getBoundingClientRect().height;
+    const rowTop=todayRow.offsetTop; scroller.scrollTo({top:Math.max(0,rowTop-headerH-4), behavior:'instant'});
   }
 
-  /* ====== Arrow key navigation ====== */
-  function attachNavHandlers(el){
-    el.addEventListener('keydown', (ev)=>{
-      const col = ev.target.dataset.col;
-      const row = +ev.target.dataset.row;
-      if(!col) return;
-      const cols = showAll? ['_subject','date','type','goal','result','review','color'] : ['date','type','goal','result','review','color'];
-      const focusTo = (r,c)=>{
-        const tbody = $('#tbody'); if(!tbody) return;
-        const tr = tbody.children[r]; if(!tr) return;
-        let el;
-        if(c==='goal') el = tr.querySelector('input[data-col="goal"]');
-        else if(c==='result') el = tr.querySelector('input[data-col="result"]');
-        else if(c==='review') el = tr.querySelector('input[data-col="review"]');
-        else if(c==='color') el = tr.querySelector('select[data-col="color"]');
-        if(el){ el.focus(); el.select?.(); }
-      };
-      if(ev.key==='ArrowUp'){ ev.preventDefault(); focusTo(Math.max(0,row-1), col); }
-      if(ev.key==='ArrowDown'){ ev.preventDefault(); focusTo(Math.min($('#tbody').children.length-1,row+1), col); }
-      if(ev.key==='ArrowLeft'){
-        const order=['goal','result','review','color'];
-        const idx=Math.max(0, order.indexOf(col)-1);
-        ev.preventDefault(); focusTo(row, order[idx]);
-      }
-      if(ev.key==='ArrowRight'){
-        const order=['goal','result','review','color'];
-        const idx=Math.min(order.length-1, order.indexOf(col)+1);
-        ev.preventDefault(); focusTo(row, order[idx]);
-      }
-    });
-  }
-
-  /* ====== Import/OCR helpers (unchanged core) ====== */
+  /* ===================== Import (CSV/Paste/OCR) ===================== */
   function normalizeDateToken(raw){
-    if(!raw) return null;
-    let s = String(raw).trim();
-    s = s.replace(/（.*?）|\(.*?\)/g,'');
-    s = s.replace(/[．。・‒–—―〜～]/g,'-');
+    if(!raw) return null; let s = String(raw).trim();
+    s = s.replace(/（.*?）|\(.*?\)/g,''); s = s.replace(/[．。・‒–—―〜～]/g,'-');
     let m = s.match(/^(\d{4})\s*[-/]\s*(\d{1,2})\s*[-/]\s*(\d{1,2})$/);
     if(m){ return {y:+m[1], mo:+m[2]-1, d:+m[3]}; }
     m = s.match(/^(\d{1,2})\s*(?:\/|月)\s*(\d{1,2})/);
@@ -661,7 +623,6 @@
     });
     return {header, rows};
   }
-
   function parseTypeImport(text){
     const lines = (text||'').replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
     let applied=0;
@@ -669,65 +630,46 @@
       const parts = ln.split(/[\s,　\t]+/).filter(Boolean);
       if(parts.length<2) continue;
       const dtk = normalizeDateToken(parts[0]); if(!dtk) continue;
-      let typ = parts[1].replace(/\s/g,'').trim();
-      if(typ==='休み') typ='休日';
+      let typ = parts[1].replace(/\s/g,'').trim(); if(typ==='休み') typ='休日';
       if(!/^(学習|休日|復習)$/.test(typ)) continue;
       if(dtk.y!==year || dtk.mo!==month) continue;
-      if(showAll){ alert('全科目（一覧）では貼り付け取込はできません。科目を選択してから実行してください。'); return 0; }
+      if(showAll){ alert('全科目（一覧）では貼付インポート不可。科目を選択してください。'); return 0; }
       const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
-      const rec = rows.find(x=>x.date===ds);
-      if(rec){ pushHistory(); rec.type=typ; if(typ==='休日'){ rec.color='gray'; } persist(rec); applied++; }
+      const rec = rows.find(x=>x.date===ds); if(rec){ pushHistory(); rec.type=typ; persist(rec); applied++; }
     }
-    if(applied) touch();
-    return applied;
+    if(applied) touch(); return applied;
   }
-
   function importCsvText(text){
     const {header, rows:objs} = parseDelimited(text);
-    const col = {};
-    header.forEach(h=>{
-      if(/日付/.test(h)) col.date=h;
-      if(/種別/.test(h)) col.type=h;
-      if(/目標/.test(h)) col.goal=h;
-      if(/結果/.test(h)) col.result=h;
-      if(/復習/.test(h)) col.review=h;
-    });
-    if(!col.date || !col.type){ alert('CSV見出しを確認してください（少なくとも「日付」「種別」）'); return 0; }
-    if(showAll){ alert('全科目（一覧）ではCSV取込はできません。科目を選択してから実行してください。'); return 0; }
-
+    const col = {}; header.forEach(h=>{ if(/日付/.test(h)) col.date=h; if(/種別/.test(h)) col.type=h; if(/目標/.test(h)) col.goal=h; if(/結果/.test(h)) col.result=h; if(/復習/.test(h)) col.review=h; });
+    if(!col.date || !col.type){ alert('CSV見出しを確認（少なくとも「日付」「種別」）'); return 0; }
+    if(showAll){ alert('全科目（一覧）ではCSV取込不可。科目を選択してください。'); return 0; }
     let applied=0;
     for(const o of objs){
       const dtk = normalizeDateToken(o[col.date]); if(!dtk) continue;
       if(dtk.y!==year || dtk.mo!==month) continue;
       const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
       const rec = rows.find(x=>x.date===ds); if(!rec) continue;
-
       let t = clean(o[col.type]); if(t==='休み') t='休日';
-      if(/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; if(t==='休日'){ rec.color='gray'; } }
-
+      if(/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; }
       if(col.goal   !== undefined) rec.goal   = clean(o[col.goal]);
       if(col.result !== undefined) rec.result = clean(o[col.result]);
       if(col.review !== undefined) rec.review = clean(o[col.review]);
-
       persist(rec); applied++;
     }
-    if(applied) touch();
-    return applied;
+    if(applied) touch(); return applied;
   }
   function looksLikeColumnBlocks(text){
     const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
     if (L.length < 12) return false;
-    const i = L.findIndex(s => s.includes('日付'));
-    if (i < 0 || i + 4 >= L.length) return false;
-    const head = L.slice(i, i+5);
-    const need = ['日付','種別','目標','結果','復習'];
+    const i = L.findIndex(s => s.includes('日付')); if (i < 0 || i + 4 >= L.length) return false;
+    const head = L.slice(i, i+5); const need = ['日付','種別','目標','結果','復習'];
     if (!need.every((w,idx)=> (head[idx]||'').includes(w))) return false;
     return L.slice(i+5).some(s => /^\d{1,2}[\/\-月]\d{1,2}/.test(s) || /^\d{4}-\d{2}-\d{2}$/.test(s));
   }
   function parseColumnBlocks(text){
     const L = text.replace(/\r/g,'').split('\n').map(s=>s.trim()).filter(Boolean);
-    const i = L.findIndex(s => s.includes('日付'));
-    const data = L.slice(i+5);
+    const i = L.findIndex(s => s.includes('日付')); const data = L.slice(i+5);
     const rows = []; let block = {}; let ptr = 0;
     for (const line of data){
       if (['日付','種別','目標','結果','復習'].includes(line)) continue;
@@ -743,137 +685,54 @@
   function importAnyText(text){
     try{ const n = importCsvText(text); if (n>0){ touch(); return n; } }catch(_){}
     if (looksLikeColumnBlocks(text)){
-      if(showAll){ alert('全科目（一覧）では取込できません。科目を選択してから実行してください。'); return 0; }
+      if(showAll){ alert('全科目（一覧）では取込不可。科目を選択してください。'); return 0; }
       const parsed = parseColumnBlocks(text);
-      let applied=0;
+      let applied=0; const col = {date:'日付', type:'種別', goal:'目標', result:'結果', review:'復習'};
       for (const o of parsed.rows){
-        const dtk = normalizeDateToken(o['日付']); if(!dtk) continue;
+        const dtk = normalizeDateToken(o[col.date]); if(!dtk) continue;
         if (dtk.y !== year || dtk.mo !== month) continue;
         const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
         const rec = rows.find(x=>x.date===ds); if(!rec) continue;
-
-        let t = clean(o['種別']); if (t==='休み') t='休日';
-        if (/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; if(t==='休日'){ rec.color='gray'; } }
-
-        rec.goal   = clean(o['目標']);
-        rec.result = clean(o['結果']);
-        rec.review = clean(o['復習']);
-
+        let t = clean(o[col.type]); if (t==='休み') t='休日';
+        if (/^(学習|休日|復習)$/.test(t)) { pushHistory(); rec.type=t; }
+        rec.goal   = clean(o[col.goal]); rec.result = clean(o[col.result]); rec.review = clean(o[col.review]);
         persist(rec); applied++;
       }
-      if(applied) touch();
-      return applied;
+      if(applied) touch(); return applied;
     }
     return 0;
   }
-
   async function ocrImage(file){
     try{ const worker = await Tesseract.createWorker('jpn'); const { data:{ text } } = await worker.recognize(file); await worker.terminate(); return text; }
     catch(e){
-      const worker = await Tesseract.createWorker('eng'); const { data:{ text } } = await worker.recognize(file); await worker.terminate(); return text;
+      try{ const worker = await Tesseract.createWorker('eng'); const { data:{ text } } = await worker.recognize(file); await worker.terminate(); return text; }
+      catch(err){ throw e; }
     }
   }
 
-  /* ====== Ranking ====== */
+  /* ===================== My Points (Month) ===================== */
   function myMonthlyPoints(){
-    let total=0;
-    const base = loadSubjectMonth(subject);
+    let total=0; const base = loadSubjectMonth(subject);
     monthDates(year,month).forEach(date=>{
       const r=base.find(x=>x.date===date); if(!r) return;
       if(r.color==='gray'){
         if(r.type==='復習') total+=6;
         else if(r.type==='学習') total+=10;
-        // 休日は0
+        else if(r.type==='休日') total+=0;
       }
     });
-    return total;
+    return total + getDailyPointsFor($('#displayName').value||'橋本淑雅'); // 今日のゆらぎも加算
   }
-  function seedRand(seed){let x=seed%2147483647; if(x<=0)x+=2147483646; return ()=> (x=x*16807%2147483647)/2147483647;}
+
+  /* ===================== Classmates & Lines (page2/4 一元) ===================== */
   const CLASSMATES = [
-    '橋本淑雅','望月亜希子','永田秀仁','高橋','嶋康','田中','池之内英明','加藤','佐々木','富田雄二','富島雅人','成木洋平','唐杉先生',
+    '橋本淑雅','望月亜希子',
+    '永田秀仁','高橋','嶋康','田中','池之内英明','加藤','佐々木','富田雄二','富島雅人','成木洋平','唐杉先生',
     'ぷろたん','大森元木','橋本範之','米山隆一','ひろゆき',
     '綾瀬はるか','永野芽郁','石原さとみ','北川景色','有村架純','長澤まさみ','広瀬すず','深田恭子',
-    '本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀','多部未華子','戸田恵梨香','広瀬アリス','吉高由里子'
+    '本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀',
+    '多部未華子','戸田恵梨香','広瀬アリス','吉高由里子'
   ];
-  function classmatesMonthlyPointsStatic(){
-    const seed=parseInt(`${year}${String(month+1).padStart(2,'0')}`);
-    const rnd=seedRand(seed); const dates=monthDates(year,month);
-    return CLASSMATES.filter(n=>n!=='橋本淑雅').map(name=>{
-      let sum=0; dates.forEach(()=>{const r=rnd(); if(r>0.65) sum+=10; else if(r>0.50) sum+=6;});
-      if(name==='望月亜希子') sum += 20 + Math.floor(rnd()*10);
-      return {name, pts:sum};
-    });
-  }
-  function yyyymmdd(d=new Date()){ const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return `${y}${m}${dd}`; }
-  function loadLive(){ try{ return JSON.parse(localStorage.getItem(RANK_LIVE_KEY)||'{}'); }catch(_){ return {}; } }
-  function saveLive(o){ try{ localStorage.setItem(RANK_LIVE_KEY, JSON.stringify(o)); }catch(_){} }
-  function loadPrev(){ try{ return JSON.parse(localStorage.getItem(RANK_PREV_KEY)||'{}'); }catch(_){ return {}; } }
-  function savePrev(o){ try{ localStorage.setItem(RANK_PREV_KEY, JSON.stringify(o)); }catch(_){} }
-
-  function activeWindowFor(name){
-    // とりあえず半々でカテゴリ割当
-    const idx = CLASSMATES.indexOf(name);
-    const type = (idx%2===0)?'school':'ronin';
-    return type;
-  }
-
-  function liveTick(){
-    const now = new Date();
-    const hh = now.getHours();
-    const cutoff = 18; // 18時で締め
-    const id = yyyymmdd(now);
-    const live = loadLive(); if(!live[id]) live[id]={};
-    if(hh >= cutoff) return; // 締切以降は加算しない（翌日へ）
-
-    CLASSMATES.filter(n=>n!=='橋本淑雅').forEach(name=>{
-      const typ = activeWindowFor(name);
-      let p = 0;
-      if(typ==='school' && hh>=16 && hh<18){ if(Math.random()<0.5) p+=1; if(Math.random()<0.18) p+=1; }
-      if(typ==='ronin'  && hh<16){          if(Math.random()<0.45) p+=1; if(Math.random()<0.15) p+=1; }
-      if(p>0){ live[id][name]=(live[id][name]||0)+p; }
-    });
-    saveLive(live);
-    renderRank(); // ライブ反映
-  }
-  setInterval(liveTick, 30000); // 30秒ごとに雰囲気可変
-
-  function renderRank(){
-    const meName=(($('#displayName').value)||'橋本淑雅').trim();
-    const mePts=myMonthlyPoints();
-
-    // 静的 + ライブ
-    const rivalsBase = classmatesMonthlyPointsStatic();
-    const id = yyyymmdd(new Date());
-    const live = loadLive()[id]||{};
-    const rivals = rivalsBase.map(o=> ({...o, pts:o.pts + (live[o.name]||0)}));
-
-    // 順位＆昇格演出
-    const list=[...rivals,{name:meName,pts:mePts,me:true}].sort((a,b)=>b.pts-a.pts);
-
-    // 前日からの順位差分で色付け
-    const prev = loadPrev();
-    const prevOrder = prev[id] || list.map(p=>p.name); // 初回は現状
-    const rankMapPrev = new Map(prevOrder.map((n,i)=>[n,i+1]));
-    const grid=$('#rankGrid'); grid.innerHTML='';
-    list.forEach((p,i)=>{
-      const rankNow=i+1;
-      const rankWas=rankMapPrev.get(p.name) ?? rankNow;
-      const diff = rankWas - rankNow; // 正なら順位UP
-      const div=document.createElement('div'); div.className='rank-item';
-      if(diff>=5) div.classList.add('rank-up5'); else if(diff>=2) div.classList.add('rank-up2');
-      div.innerHTML=`<div class="rank-row">
-          <div class="rank-no">${rankNow}位</div>
-          <div class="grow"><strong>${p.name}</strong> <span class="muted">${diff? (diff>0?`↑${diff}`:`↓${-diff}`):''}</span></div>
-          <div>${p.pts} pt</div>
-        </div>`;
-      grid.appendChild(div);
-    });
-    // 次回比較用に保存
-    prev[id] = list.map(p=>p.name);
-    savePrev(prev);
-  }
-
-  /* ====== Page2: Class ====== */
   const FEMALES = new Set(['望月亜希子','綾瀬はるか','永野芽郁','石原さとみ','北川景色','有村架純','長澤まさみ','広瀬すず','深田恭子','本田翼','杏','木村文乃','優香','生田絵梨花','上戸彩','菜々緒','内田有紀','多部未華子','戸田恵梨香','広瀬アリス','吉高由里子']);
   const FAMOUS_SET = new Set([
     'ぷろたん','大森元木','米山隆一','ひろゆき',
@@ -882,124 +741,99 @@
     '望月亜希子'
   ]);
 
-  // 既定セリフ（人ごとに異なる内容を多数セット）
-  const defaultLines = {
-    '橋本淑雅': ['としくん、深呼吸していこ！','5分でいい、ペンを動かそう','今日は「勝てる日」にしよ'],
-    '望月亜希子': ['あ、これ解説うまくまとめたよ','休憩のとき紅茶いれる？','やるじゃん、としくん！'],
-    '永田秀仁': ['一次大戦の原因は…三国同盟vs三国協商だぞ','世界史スルメ、噛むほど旨い'],
-    '高橋': ['英単語カード回す？','数学は例題→基本問題の順で固める派'],
-    '嶋康': ['ノート写経しても点は伸びない、解くべし！','ニュース見た？中東情勢また動いてる'],
-    '田中': ['暗記は声に出すと定着率1.5倍(体感)','寝不足は敵、今日は早寝で勝つ'],
-    '池之内英明': ['宗教改革、語れます？ルターとカルヴァン違いチェック','歴史年号は語呂で踊ろう'],
-    '加藤': ['英語、受動態→分詞構文の流れがカギ','発音練習でリスニング爆伸びするよ'],
-    '佐々木': ['鎌倉新仏教：法然・親鸞・道元・日蓮！','仏教って現代にも使えるんだよね'],
-    '富田雄二': ['今日はベース練…じゃなくて基礎練！','集中25分→休憩5分のポモドーロで'],
-    '富島雅人': ['ミセスの新曲よかったわ〜（大森に同意）','としくん、リズム作ってこ'],
-    '成木洋平': ['気圧低い日は無理せず、薄く長くでOK','コーヒーは午後2時まで派'],
-    '唐杉先生': ['まずは教科書！次に問題集！順序が命！','復習こそ王道、予習は効率UPの鍵'],
-    'ぷろたん': ['背中の日か？いや暗記の日だ！','タンパク質摂ってから勉強すると集中違うぞ'],
-    '大森元木': ['ミセス「Soranji」聴いて気合い入れよ！','歌詞って英語表現の宝庫だよね'],
-    '橋本範之': ['ベイズ思考でいこう、仮説→検証！','統計は裏切らない'],
-    '米山隆一': ['ニュースは1次情報に当たろう','政策比較、要点を3行で書ける？'],
-    'ひろゆき': ['それってあなたの感想ですよね？ でも根拠は？','まずは手を動かすのがコスパ良いです'],
-    '綾瀬はるか': ['笑っていこう！間違っても大丈夫','水分とってね'],
-    '永野芽郁': ['付箋でカラフル作戦いこ♪','としくん、今日も一歩！'],
-    '石原さとみ': ['声に出すと表情も動いて覚えやすいよ','姿勢ピンで集中UP'],
-    '北川景色': ['ノートは美しく！見返したくなる魔法','英作文、主語→動詞でリズム作ろ'],
-    '有村架純': ['応援してるよ、焦らずいこう','ごほうび用チョコ準備した？'],
-    '長澤まさみ': ['やる時はやる！そういうの好き','区切って考えるとできるよ'],
-    '広瀬すず': ['BGMはローファイか雨音が最強説','タイマー回す？3,2,1…スタート！'],
-    '深田恭子': ['睡眠は正義♡','としくん、ちゃんと食べた？'],
-    '本田翼': ['ゲームはクリア、勉強もクエスト！','チェックリスト埋めよ！'],
-    '杏': ['SDGsネタで小論文いけるやつ','本質はどこ？問いを立てよう'],
-    '木村文乃': ['スキマ時間の使い方が勝負','単語は声に出して3周'],
-    '優香': ['頑張りすぎ注意〜！','姿勢猫背禁止ね'],
-    '生田絵梨花': ['音読はリズム、抑揚つけて','音楽で集中ゾーン入ろ'],
-    '上戸彩': ['小目標をクリアして達成感積もう','スマホ遠ざけよ'],
-    '菜々緒': ['姿勢良く、シャキッと！','自信は積み上げの副産物'],
-    '内田有紀': ['ノートの余白に気づきをメモ','復習に色をつけて差分を見よ'],
-    '多部未華子': ['一気にやらず、細切れに丁寧に','昼寝15分で回復'],
-    '戸田恵梨香': ['仮説を立ててから読むと捗るよ','要約3行チャレンジ！'],
-    '広瀬アリス': ['としくん、ナイスファイト！','今日は肩の力抜いてね'],
-    '吉高由里子': ['ハイライト引きすぎ注意！要点だけ','ご褒美は“終わってから”ね']
-  };
-  const BASE_GENERAL = ['今日も一歩ずつ！','その調子！','休憩も忘れずに','昨日の復習いこ！','目標メモした？','終わったら＋10ptだ！','分からない所は付箋！','焦らず丁寧に！','5分だけでも手を動かそう','間違いは伸びしろだ！'];
+  // 初期既定セリフ（全員異なる系を少量ずつ）
+  const DEFAULT_CUSTOM_LINES = (()=> {
+    const meName = ($('#displayName')?.value)||'としくん';
+    const gen = (a)=>a; // 短く
+    return {
+      '橋本淑雅': gen(['今日の自分に勝とう！','小さな完了が大きな自信になるよ','休むのも戦略だよ']),
+      '望月亜希子': gen(['あ、教科書そこ！一緒にやろ？','今ここ踏ん張れば明日が楽だよ','ちょっと伸びてる、いい波！']),
+      '永田秀仁': gen(['微積の例題ここ重要','休憩5分→再開！','目次に印つけとけー']),
+      '高橋': gen(['歴史は因果で覚える派！','語呂合わせ作っといたよ','図録見ると記憶に刺さる']),
+      '嶋康': gen(['英単語10個だけ追加しよ','“chunk”で覚えると速い','ノートに星印！']),
+      '田中': gen(['資料集の地図、穴場だぞ','ググらずまず考える派','今日はアウトプット多めで']),
+      '池之内英明': gen(['睡眠負債ためないでね','糖分よりタンパク質！','姿勢を立て直そ']),
+      '加藤': gen(['昨日より+1ページ！','わからんはメモって後で質問','書いて覚える→声に出す']),
+      '佐々木': gen(['今日の+10pt取りにいこ','テンポ出すなら25分集中','スマホを裏返し！']),
+      '富田雄二': gen(['世界史は「流れ」で','革命→産業→帝国主義の線','年号は区切って覚える']),
+      '富島雅人': gen(['英作1文、推敲しよ','SVOCの核を太字に！','例文まるごと暗唱！']),
+      '成木洋平': gen(['漢文、返り点マスター企画','素読でリズム掴める','語彙カード更新した？']),
+      '唐杉先生': gen(['基礎が最強の近道だぞ','音読は裏切らん','質問はいつでも歓迎！']),
+      'ぷろたん': gen(['筋トレも勉強も継続ゲー！','締切ドーピング発動だ！','水分補給してけー']),
+      '大森元木': gen(['ミセス聴きながらやるか！','“青と夏”流す？','BPMでポモドーロ刻もう']),
+      '橋本範之': gen(['計画→実行→振り返りの三段','未完了は翌日に逃がすだけ','焦らず前進']),
+      '米山隆一': gen(['ニュースの背景を一次資料で','統計はソースを見る！','疑う→確かめる→納得']),
+      'ひろゆき': gen(['それってあなたの感想ですよね？→データ出そう','コスパ良くいこう','結論から書くと読みやすい']),
+      '綾瀬はるか': gen(['深呼吸していこっ','姿勢きれい！','応援してるよ']),
+      '永野芽郁': gen(['集中スイッチ入れよ？','コーヒー淹れよっか','その調子！']),
+      '石原さとみ': gen(['区切っていけば絶対できる','顔上げて、前見てね','目標、声に出してみよ']),
+      '北川景色': gen(['静かに燃えてる感じ好き','今は基礎に投資の時期','手元のメモ美しい']),
+      '有村架純': gen(['一緒にがんばろっ','休憩は悪じゃない','えらい、ちゃんとやってる']),
+      '長澤まさみ': gen(['今日のベストを積み上げよ','笑ってやるのが最強','負けない！']),
+      '広瀬すず': gen(['やればできるの証明中','1問クリアで自信1個UP','水分とろ！']),
+      '深田恭子': gen(['自分甘やかしすぎない程度に','でも優しくね','無理しない勇気']),
+      '本田翼': gen(['ゲーム感覚で進捗稼ご！','クエスト受注だー','ドロップ狙い！']),
+      '杏': gen(['朝の光、好きだね','ノートに余白つくろ','小さくても今日の勝ちを']),
+      '木村文乃': gen(['淡々とやる人が結局勝つ','器用じゃなくていい','続けるセンス']),
+      '優香': gen(['体温めて集中力UP','笑うと血流あがるよ','肩回してこ！']),
+      '生田絵梨花': gen(['音で覚えるのも手だよ','リズム練ると捗る','区切りごとに拍']),
+      '上戸彩': gen(['“今やる”のが一番早い','未来の自分が喜ぶよ','いけるいける！']),
+      '菜々緒': gen(['言い訳、ゼロでいこ？','結果で語る日','自分に強く']),
+      '内田有紀': gen(['紙に書くと整理できる','視覚化は武器','タスク分解しよ']),
+      '多部未華子': gen(['比喩で覚えると忘れにくい','イメージ大事','図解つくろ']),
+      '戸田恵梨香': gen(['語彙の森に探検だ','派生語まとめよ','語源は物語']),
+      '広瀬アリス': gen(['笑ってやろーぜ','詰まったら深呼吸','やればできる！']),
+      '吉高由里子': gen(['ノリと勢いも大切','まず手を動かそ','完璧より前進'])
+    };
+  })();
 
-  // 保存/読込（Page4と共通）
   let customLines = loadCustomLines();
-  function loadCustomLines(){ try{ const raw=localStorage.getItem(LINES_KEY); return raw? JSON.parse(raw): {}; }catch(_){ return {}; } }
-  let lineAutosaveTimer=null;
-  function scheduleLinesSave(){ if(lineAutosaveTimer) clearTimeout(lineAutosaveTimer); lineAutosaveTimer = setTimeout(()=>{ saveCustomLines(); }, 600); }
+  function loadCustomLines(){
+    try{
+      const raw=localStorage.getItem(LINES_KEY);
+      if(raw){ return JSON.parse(raw)||{}; }
+      // 初回：既定を保存して使う（全員ことなる）
+      try{ localStorage.setItem(LINES_KEY, JSON.stringify(DEFAULT_CUSTOM_LINES)); }catch(_){}
+      return JSON.parse(JSON.stringify(DEFAULT_CUSTOM_LINES));
+    }catch(_){ return JSON.parse(JSON.stringify(DEFAULT_CUSTOM_LINES)); }
+  }
   function saveCustomLines(){ try{ localStorage.setItem(LINES_KEY, JSON.stringify(customLines)); }catch(_){} }
+  let lineAutosaveTimer=null;
+  function scheduleLinesSave(){ if(lineAutosaveTimer) clearTimeout(lineAutosaveTimer); lineAutosaveTimer=setTimeout(()=>{ saveCustomLines(); }, 600); }
 
   function getLinesFor(name){
-    if(Object.prototype.hasOwnProperty.call(customLines, name)){
-      const arr = Array.isArray(customLines[name]) ? customLines[name] : [];
-      return arr;
-    }
-    // 既定（人別→なければ一般）
-    if(defaultLines[name]) return defaultLines[name].slice();
-    return BASE_GENERAL.slice();
+    const arr = Array.isArray(customLines[name]) ? customLines[name] : [];
+    return arr.length ? arr.slice() : [];
   }
 
   const recentLines = [];
-  function pickLine(name){
+  function lineFor(name){
     const pool = getLinesFor(name);
-    if(!pool.length) return null;
+    if(pool.length===0) return null;
     let msg = pool[Math.floor(Math.random()*pool.length)];
     let guard = 0;
-    while(recentLines.includes(msg) && guard++<8){ msg = pool[Math.floor(Math.random()*pool.length)]; }
+    while(recentLines.includes(msg) && guard++<10){
+      msg = pool[Math.floor(Math.random()*pool.length)];
+    }
     recentLines.push(msg); if(recentLines.length>24) recentLines.shift();
     return msg;
   }
 
-  // 速さ調整
-  function factorFromBoost(boostPct){ const k = Math.max(0, Number(boostPct)||0); return 1 / (1 + k/100); }
+  // ランダム強化：たまに巨大叫び
+  function randomIsYell(){ return Math.random() < 0.14; }
+
+  /* ===================== Classroom ===================== */
+  let classTicker = null; const lastSpokenAt = new Map(); let layoutMode='MFM'; // or 'shuffle'
+  function factorFromBoost(k){ return 1 / (1 + Math.max(0, Number(k)||0)/100); }
   function getBoost(){ const v = Number($('#boostInput').value)||0; return Math.max(0, v); }
-
-  // 複数人同時発言 with たまにデカ声
-  let classTicker = null;
-  const lastSpokenAt = new Map();
-  function visibleDurationMs(){ return Math.round(2800 * factorFromBoost(getBoost())); }
+  function visibleDurationMs(){ return Math.round(2600 * factorFromBoost(getBoost())); }
   function cooldownMs(){ return Math.max(700, Math.round(visibleDurationMs()*0.9)); }
-  function baseTickMs(){ return Math.max(180, Math.round(1100 * factorFromBoost(getBoost()))); }
-  function randomEmissionCount(){ const r=Math.random(); if(r<0.18) return 0; if(r<0.55) return 1; if(r<0.88) return 2; if(r<0.97) return 3; return 4; }
+  function baseTickMs(){ return Math.max(200, Math.round(800 * factorFromBoost(getBoost()))); }
+  function randomEmissionCount(){ const r=Math.random(); if(r<0.15) return 0; if(r<0.45) return 1; if(r<0.80) return 2; if(r<0.96) return 3; return 4; }
 
-  // ランクUP組の応援ブースト
-  function boostSpeakers(){
-    const id = yyyymmdd(new Date());
-    const prev = loadPrev()[id]||[];
-    const now = Array.from($('#rankGrid')?.querySelectorAll('.rank-item strong')||[]).map(el=>el.textContent);
-    const mapPrev = new Map(prev.map((n,i)=>[n,i+1]));
-    return new Set(now.filter((n,i)=> (mapPrev.get(n)??(i+1)) - (i+1) >= 2));
-  }
-
-  function showBubble(deskEl, name){
-    const bubble = deskEl.querySelector('.bubble'); if(!bubble) return;
-    const msg = pickLine(name); if(msg === null){ bubble.classList.remove('show'); return; }
-    const isFamous = FAMOUS_SET.has(name);
-    bubble.className = 'bubble' + (isFamous ? ' famous' : '');
-    bubble.textContent = msg;
-    // サイズランダム＆たまに大声
-    if(Math.random()<0.18) bubble.classList.add('shout'); else bubble.classList.remove('shout');
-    if(Math.random()<0.12) bubble.style.fontSize = (14 + Math.floor(Math.random()*10))+'px';
-    else bubble.style.fontSize = '14px';
-
-    bubble.classList.add('show');
-    const vms = visibleDurationMs();
-    setTimeout(()=> bubble.classList.remove('show'), vms);
-    lastSpokenAt.set(name, Date.now());
-  }
-
-  let seatShuffleSeed = 0;
-  function arrangeNamesMFM(shuffle=false){
-    let males = CLASSMATES.filter(n=>!FEMALES.has(n));
-    let females = CLASSMATES.filter(n=>FEMALES.has(n));
-    if(shuffle){
-      const rng = seedRand(++seatShuffleSeed + Date.now());
-      males = males.sort(()=>rng()-0.5);
-      females = females.sort(()=>rng()-0.5);
-    }
+  function arrangeNamesMFM(){
+    const males = CLASSMATES.filter(n=>!FEMALES.has(n));
+    const females = CLASSMATES.filter(n=>FEMALES.has(n));
     const half = Math.ceil(males.length/2);
     const col1 = males.slice(0, half);
     const col3 = males.slice(half);
@@ -1013,26 +847,33 @@
     }
     return arranged;
   }
-
-  function buildClassroom(shuffle=false){
+  function buildClassroom(){
     const desks=$('#desks'); if(!desks) return; desks.innerHTML='';
-    const names = arrangeNamesMFM(shuffle);
-    const boosters = boostSpeakers();
+    const names = (layoutMode==='MFM') ? arrangeNamesMFM() : shuffle(CLASSMATES.slice());
     names.forEach((name)=>{
       const d=document.createElement('div'); d.className='desk';
       d.classList.add(FEMALES.has(name)?'female':'male');
       d.innerHTML = `
         <div class="name">${name}</div>
         <div class="role">${name==='橋本淑雅'?'（あなた）':'クラスメイト'}</div>
-        <div class="bubble"></div>
-      `;
+        <div class="bubble"></div>`;
       d.addEventListener('click',()=> showBubble(d, name));
-      // ブースターは時々すぐ発言
-      if(boosters.has(name) && Math.random()<0.4) setTimeout(()=>showBubble(d,name), 400+Math.random()*800);
       desks.appendChild(d);
     });
   }
-
+  function showBubble(deskEl, name){
+    const bubble = deskEl.querySelector('.bubble'); if(!bubble) return;
+    const msg = lineFor(name); if(msg === null){ bubble.classList.remove('show'); return; }
+    const isFamous = FAMOUS_SET.has(name);
+    bubble.className = 'bubble' + (isFamous ? ' famous' : '') + (randomIsYell() ? ' yell':'');
+    // 大幅ランクアップ者からの応援ブースト
+    const cheer = getCheerPrefixFor(name);
+    bubble.textContent = cheer ? `${cheer}`.replace('{me}', $('#displayName').value||'としくん') + '\n' + msg : msg;
+    bubble.classList.add('show');
+    const vms = visibleDurationMs();
+    setTimeout(()=> bubble.classList.remove('show'), vms);
+    lastSpokenAt.set(name, Date.now());
+  }
   function tickOnce(){
     const desks = Array.from(document.querySelectorAll('#desks .desk'));
     if(desks.length===0) return;
@@ -1042,81 +883,153 @@
       .map(el=>({el, name: el.querySelector('.name')?.textContent || ''}))
       .filter(x=>x.name && (!lastSpokenAt.has(x.name) || (now - (lastSpokenAt.get(x.name)||0) > cooldownMs())))
       .filter(x=> (getLinesFor(x.name).length>0));
-    if(!candidates.length) return;
     for(let i=0; i<count && candidates.length>0; i++){
       const idx = Math.floor(Math.random()*candidates.length);
       const pick = candidates.splice(idx,1)[0];
       showBubble(pick.el, pick.name);
     }
   }
-
   function startClassTicker(){ stopClassTicker(); classTicker = setInterval(tickOnce, baseTickMs()); }
   function stopClassTicker(){ if(classTicker){ clearInterval(classTicker); classTicker=null; } }
   function restartClassTicker(){ stopClassTicker(); startClassTicker(); }
 
-  /* ====== Page4: Editor with Undo/Redo ====== */
-  const linesHistory = { past:[], future:[] };
-  function pushLines(){ linesHistory.past.push(JSON.stringify(customLines)); linesHistory.future.length=0; }
-  function undoLines(){ if(!linesHistory.past.length) return; const cur=JSON.stringify(customLines); const prev=linesHistory.past.pop(); linesHistory.future.push(cur); customLines=JSON.parse(prev); saveCustomLines(); renderEditPage(); }
-  function redoLines(){ if(!linesHistory.future.length) return; const cur=JSON.stringify(customLines); const nxt=linesHistory.future.pop(); linesHistory.past.push(cur); customLines=JSON.parse(nxt); saveCustomLines(); renderEditPage(); }
+  function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 
+  /* ===================== Editor (Page4) ===================== */
   function renderEditPage(){
     const grid = $('#editGrid'); if(!grid) return;
     grid.innerHTML='';
     CLASSMATES.forEach(name=>{
-      const card = document.createElement('div');
-      card.className='card';
-      const id = 'ta_'+btoa(unescape(encodeURIComponent(name))).replace(/=+/g,'');
+      const card=document.createElement('div'); card.className='card';
+      const id='ta_'+btoa(unescape(encodeURIComponent(name))).replace(/=+/g,'');
       const lines = getLinesFor(name);
-      const text = (Object.prototype.hasOwnProperty.call(customLines, name) ? customLines[name] : lines).join('\n');
-      card.innerHTML = `
+      const text = lines.join('\n');
+      card.innerHTML=`
         <h4>${name}</h4>
-        <textarea id="${id}" placeholder="1行=1セリフ。空にするとミュート">${escapeHtml(text)}</textarea>
+        <textarea id="${id}" placeholder="1行=1セリフ。空ならミュート">${escapeHtml(text)}</textarea>
         <div class="row">
-          <button data-name="${name}" class="btnClear">ミュート（空にする）</button>
+          <button data-name="${name}" class="btnClear chip">ミュート（空に）</button>
           <span class="muted">現在 ${lines.length} 件</span>
-        </div>
-      `;
+        </div>`;
       grid.appendChild(card);
       const ta = card.querySelector('textarea');
-      ta.addEventListener('input',()=>{
-        pushLines();
-        const v = String(ta.value||'');
-        const arr = v.split('\n').map(s=>s.trim()).filter(s=>s.length>0);
-        customLines[name] = arr;
-        scheduleLinesSave();
+      ta.addEventListener('input', ()=>{
+        pushHistory();
+        const v=String(ta.value||''); const arr=v.split('\n').map(s=>s.trim()).filter(Boolean);
+        customLines[name]=arr; scheduleLinesSave();
       });
       card.querySelector('.btnClear').addEventListener('click',()=>{
-        pushLines();
-        customLines[name] = [];
-        const ta2 = card.querySelector('textarea'); ta2.value='';
-        scheduleLinesSave();
+        pushHistory(); customLines[name]=[]; const ta2=card.querySelector('textarea'); ta2.value=''; scheduleLinesSave();
       });
     });
   }
   function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
   $('#exportLines').addEventListener('click',()=>{
     const blob = new Blob([JSON.stringify(customLines, null, 2)], {type:'application/json'});
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'class_lines.json'; a.click(); URL.revokeObjectURL(a.href);
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='class_lines.json'; a.click(); URL.revokeObjectURL(a.href);
   });
   $('#importLinesFile').addEventListener('change',async(e)=>{
     const f=e.target.files?.[0]; if(!f) return;
-    try{
-      const txt=await f.text();
-      const obj=JSON.parse(txt);
-      if(obj && typeof obj==='object'){ pushLines(); customLines = obj; saveCustomLines(); renderEditPage(); }
+    try{ const txt=await f.text(); const obj=JSON.parse(txt);
+      if(obj && typeof obj==='object'){ pushHistory(); customLines=obj; saveCustomLines(); renderEditPage(); }
     }catch(_){ alert('JSONの読み込みに失敗しました'); }
     e.target.value='';
   });
 
-  /* ====== Timetable ====== */
+  /* ===================== Rank ===================== */
+  function seedRand(seed){let x=seed%2147483647; if(x<=0)x+=2147483646; return ()=> (x=x*16807%2147483647)/2147483647;}
+  function classmatesMonthlyBase(){
+    const seed=parseInt(`${year}${String(month+1).padStart(2,'0')}`);
+    const rnd=seedRand(seed); const dates=monthDates(year,month);
+    return CLASSMATES.filter(n=>n!=='橋本淑雅').map(name=>{
+      let sum=0; dates.forEach(()=>{const r=rnd(); if(r>0.65) sum+=10; else if(r>0.50) sum+=6;});
+      if(name==='望月亜希子') sum += 20 + Math.floor(rnd()*10); // 望月さん強化
+      return {name, pts:sum};
+    });
+  }
+
+  // 日別ゆらぎ（18時までライブ）を保持
+  function loadDailyPoints(){
+    try{ const raw=localStorage.getItem(DP_KEY); return raw? JSON.parse(raw): {}; }catch(_){ return {}; }
+  }
+  function saveDailyPoints(obj){ try{ localStorage.setItem(DP_KEY, JSON.stringify(obj)); }catch(_){} }
+  function getDailyPointsFor(name){
+    const all=loadDailyPoints(); const today=ymd(new Date());
+    return (all[today]?.[name])||0;
+  }
+  function addDailyPoints(name, delta){
+    const all=loadDailyPoints(); const today=ymd(new Date());
+    if(!all[today]) all[today]={}; all[today][name]=(all[today][name]||0)+delta; saveDailyPoints(all);
+  }
+
+  let lastOrder = []; // 前回の並び（順位変動表示用）
+  function renderRank(){
+    const meName=(($('#displayName').value)||'橋本淑雅').trim();
+    const mePts=myMonthlyPoints();
+    let rivals=classmatesMonthlyBase();
+
+    // 日別ゆらぎを合算
+    const allDP = loadDailyPoints(); const today=ymd(new Date());
+    rivals = rivals.map(p=> ({...p, pts:p.pts + ((allDP[today]?.[p.name])||0)}));
+    const list=[...rivals,{name:meName,pts:mePts,me:true}].sort((a,b)=>b.pts-a.pts);
+
+    const nowOrder = list.map(p=>p.name);
+    const grid=$('#pageRank #rankGrid'); grid.innerHTML='';
+
+    list.forEach((p,i)=>{
+      const was = lastOrder.indexOf(p.name);
+      const delta = (was>=0) ? (was - i) : 0; // 上がったら + 値
+
+      const div=document.createElement('div'); div.className='rank-item';
+      if(delta>=5) div.classList.add('rise5'); else if(delta>=2) div.classList.add('rise2');
+
+      div.innerHTML=`<div class="rank-row">
+        <div class="rank-no">${i+1}位</div>
+        <div class="grow"><strong>${p.name}</strong></div>
+        <div>${p.pts} pt</div>
+      </div>`;
+      grid.appendChild(div);
+      if(delta>=2) flagCheer(p.name, delta); // 応援フラグ（教室で励まし）
+    });
+    lastOrder = nowOrder;
+    $('#rankTicker').textContent = 'リアルタイム更新（〜18:00）稼働中';
+  }
+
+  // 18:00までランダムで加点（学校勢は夕方に伸びやすい）
+  function rankLiveTick(){
+    const hour=(new Date()).getHours();
+    const cutOff = hour>=18;
+    if(cutOff){ $('#rankTicker').textContent='本日のライブ加点は終了（以降は翌日に反映）'; return; }
+    const pool = CLASSMATES.filter(n=>n!=='橋本淑雅');
+    // 時間帯で重み
+    const isSchoolTime = (hour>=16 && hour<18);
+    const isMorning = (hour>=8 && hour<12);
+    const nChanges = isSchoolTime? 4 : (isMorning? 3 : 2);
+    for(let i=0;i<nChanges;i++){
+      const name = pool[Math.floor(Math.random()*pool.length)];
+      const delta = isSchoolTime? (Math.random()<0.5? 6:10) : (Math.random()<0.5? 0:6);
+      if(delta>0) addDailyPoints(name, delta);
+    }
+    renderRank();
+  }
+  setInterval(rankLiveTick, 30000); // 30秒おき
+
+  // 応援フラグ→教室でセリフ前置き
+  const cheerers = new Set();
+  function flagCheer(name, delta){ if(delta>=5){ cheerers.add(name+'+5'); } else if(delta>=2){ cheerers.add(name+'+2'); } }
+  function getCheerPrefixFor(name){
+    const me = $('#displayName').value||'としくん';
+    if(cheerers.has(name+'+5')) return `【急上昇】{me}、ここから一気に決めよう！`;
+    if(cheerers.has(name+'+2')) return `【順位↑】{me}、いい流れだね！`;
+    return '';
+  }
+
+  /* ===================== Timetable (modal) ===================== */
   function ttKey(s=subject){ return `${TT_KEY}:${s}`; }
   function loadTT(s=subject){ try{ const raw=localStorage.getItem(ttKey(s)); return raw? JSON.parse(raw): []; }catch(_){ return []; } }
   function saveTT(s=subject, data){ try{ localStorage.setItem(ttKey(s), JSON.stringify(data)); }catch(_){} }
-
   function renderTimetable(){
-    const title = $('#ttTitle'); title.textContent = showAll? '（全科目モード：表示のみ）今日の時間割' : `${subject} の今日の時間割`;
+    const title = $('#ttTitle'); title.textContent = `${subject} の今日の時間割`;
     const rowsEl = $('#ttRows'); rowsEl.innerHTML='';
     const data = loadTT(subject);
     data.forEach((item,idx)=>{
@@ -1139,61 +1052,73 @@
       row.querySelector('[data-act="down"]').addEventListener('click',()=>{ if(idx<data.length-1){ const t=data[idx+1]; data[idx+1]=data[idx]; data[idx]=t; saveTT(subject, data); renderTimetable(); }});
       rowsEl.appendChild(row);
     });
-    $('#ttAddRow').disabled = showAll;
-    $('#ttShuffle20').disabled = showAll;
-    $('#ttAdopt').disabled = showAll;
   }
+  // モーダル開閉
+  const modal=$('#ttModal');
+  $('#ttOpen').addEventListener('click',()=>{ modal.classList.add('show'); renderTimetable(); });
+  $('#ttClose').addEventListener('click',()=> modal.classList.remove('show'));
+  modal.addEventListener('click',(e)=>{ if(e.target===modal) modal.classList.remove('show'); });
 
-  // 提案20
-  let proposals = []; let propIdx = 0;
-  function genProposals(){
-    const out=[];
-    const today = new Date(); const todayYmd = ymd(today);
-    const base = loadSubjectMonth(subject);
-    const todo = [];
-    base.forEach(r=>{
-      if(r.date>=todayYmd && r.color!=='gray'){ if(r.goal) todo.push(r.goal); if(r.review) todo.push('復習: '+r.review); }
-    });
-    if(todo.length===0){ todo.push('予習/復習'); }
-    const starts = ['07:30','08:00','13:00','15:30','16:00'];
-    for(let k=0;k<20;k++){
-      const plan=[];
-      let cur = starts[Math.floor(Math.random()*starts.length)];
-      let [h,m] = cur.split(':').map(Number);
-      const endHour = 22;
-      while(h<endHour){
-        const dur = [45,50,60][Math.floor(Math.random()*3)];
-        const brk = [5,10,10][Math.floor(Math.random()*3)];
-        const title = todo[Math.floor(Math.random()*todo.length)];
-        const startStr = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-        let hm = h*60+m+dur; let eh=Math.floor(hm/60), em=hm%60;
-        const endStr = `${String(eh).padStart(2,'0')}:${String(em).padStart(2,'0')}`;
-        plan.push({start:startStr, end:endStr, title});
-        hm += brk; h=Math.floor(hm/60); m=hm%60;
-        if(plan.length>8 && Math.random()<0.3) break;
+  // 行追加
+  $('#ttAddRow').addEventListener('click',()=>{
+    const data = loadTT(subject); data.push({start:'', end:'', title:''}); saveTT(subject, data); renderTimetable();
+  });
+
+  // 提案20件
+  let suggestions=[]; let sugIndex=0;
+  function generateSuggestions(){
+    // だいたい今日の今から or 09:00開始 〜 18:00までで可変
+    const baseStart = new Date(); baseStart.setMinutes( baseStart.getMinutes()>0 ? Math.ceil(baseStart.getMinutes()/5)*5 : 0 );
+    const startHour = Math.max(9, baseStart.getHours());
+    const dayStart = new Date(); dayStart.setHours(startHour, 0, 0, 0);
+    const endHour = 18;
+
+    function slotsMake(seed){
+      const rng = seedRand(seed); const blocks=[];
+      let t = new Date(dayStart);
+      const subs = shuffle(subjects.slice());
+      while(t.getHours() < endHour){
+        const dur = [25,30,40,45,50,60][Math.floor(rng()*6)];
+        const nt = new Date(t.getTime() + dur*60000);
+        const s = String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+        const e = String(nt.getHours()).padStart(2,'0')+':'+String(nt.getMinutes()).padStart(2,'0');
+        const pick = subs[Math.floor(rng()*subs.length)];
+        const label = (rng()<0.5? '復習':'学習') + '：' + pick;
+        blocks.push({start:s,end:e,title:label});
+        t = new Date(nt.getTime()+ (rng()<0.4? 5:10)*60000); // 休憩
       }
-      out.push(plan);
+      return blocks.slice(0, Math.min(9, blocks.length));
     }
-    return out;
+    const list=[]; for(let i=0;i<20;i++) list.push(slotsMake(Date.now()+i*97));
+    return list;
   }
-
-  $('#ttShuffle20').addEventListener('click',()=>{ proposals = genProposals(); propIdx=0; showProposal(); });
-  function showProposal(){
-    if(!proposals.length){ $('#ttPreview').textContent='提案がありません。「自動提案(20)」を押してください。'; return; }
-    $('#ttPreview').textContent = `提案 ${propIdx+1} / ${proposals.length}　← / → で切替、採用で固定`;
+  $('#ttSuggest').addEventListener('click',()=>{
+    suggestions = generateSuggestions(); sugIndex=0;
+    $('#ttSuggestBar').style.display='flex';
+    previewSuggestion();
+  });
+  function previewSuggestion(){
+    const data = suggestions[sugIndex]||[];
+    const rowsEl = $('#ttRows'); rowsEl.innerHTML='';
+    data.forEach(item=>{
+      const row=document.createElement('div'); row.className='tt-row';
+      row.innerHTML=`
+        <div>${item.start}</div>
+        <div>${item.end}</div>
+        <div>${escapeHtml(item.title)}</div>
+        <div class="muted">提案プレビュー</div>`;
+      rowsEl.appendChild(row);
+    });
+    $('#ttIndex').textContent = `${sugIndex+1} / ${suggestions.length}`;
   }
-  $('#ttAdopt').addEventListener('click',()=>{
-    if(!proposals.length) return;
-    saveTT(subject, proposals[propIdx]); renderTimetable();
-  });
-  document.addEventListener('keydown',(e)=>{
-    const panelOpen = $('#ttBox').classList.contains('open');
-    if(!panelOpen || !proposals.length) return;
-    if(e.key==='ArrowRight'){ propIdx=(propIdx+1)%proposals.length; showProposal(); e.preventDefault(); }
-    if(e.key==='ArrowLeft'){ propIdx=(propIdx+proposals.length-1)%proposals.length; showProposal(); e.preventDefault(); }
+  $('#ttPrev').addEventListener('click',()=>{ if(sugIndex>0){ sugIndex--; previewSuggestion(); }});
+  $('#ttNext').addEventListener('click',()=>{ if(suggestions && sugIndex<suggestions.length-1){ sugIndex++; previewSuggestion(); }});
+  $('#ttApply').addEventListener('click',()=>{
+    const data = suggestions[sugIndex]||[];
+    saveTT(subject, data); renderTimetable(); alert('提案を採用しました。必要ならここから編集できます。');
   });
 
-  /* ====== Events ====== */
+  /* ===================== Events / Buttons ===================== */
   (function initName(){
     const saved=localStorage.getItem(NAME_KEY);
     const me = saved || '橋本淑雅';
@@ -1212,7 +1137,6 @@
   $('#tabClass').addEventListener('click',()=>showPage('class'));
   $('#tabRank').addEventListener('click',()=>showPage('rank'));
   $('#tabEdit').addEventListener('click',()=>showPage('edit'));
-
   function setActiveTab(t1,t2,t3,t4){
     $('#tabProgress').classList.toggle('active', t1);
     $('#tabClass').classList.toggle('active', t2);
@@ -1233,50 +1157,43 @@
   $('#next').addEventListener('click',()=>{ pushHistory(); flushAutoSave(); month+=1; if(month>11){month=0;year+=1;} renderProgress(); renderRank(); });
 
   // 保存/読込
-  $('#save').addEventListener('click',save);
+  $('#save').addEventListener('click',()=>{ pushHistory(); flushAutoSave(); alert('更新しました（この端末のブラウザ内）'); renderRank(); scrollTodayIntoView(); });
   $('#load').addEventListener('click',()=>{ const ok=load(); renderProgress(); renderRank(); alert(ok?'読み込みました':'保存データが見つかりません'); });
 
-  // 表示切替
+  // 一覧表示(コンパクト)
   $('#toggleCompact').addEventListener('click',()=>{ document.body.classList.toggle('compact'); setTimeout(scrollTodayIntoView,0); });
 
   // 取込
   $('#importPaste').addEventListener('click',()=>{
-    if(showAll){ alert('全科目（一覧）では取込できません。科目を選んでください。'); return; }
-    const text = prompt('日付と種別の一覧や、縦一列の表を貼り付け（例: 8/13(日) 休日 など）');
-    if(!text) return;
-    pushHistory();
-    const n = parseTypeImport(text) || importAnyText(text);
+    if(showAll){ alert('全科目（一覧）では取込不可。科目を選んでください。'); return; }
+    const text = prompt('日付と種別の一覧や、縦一列の表を貼り付け（例: 8/13(日) 休日 など）'); if(!text) return;
+    pushHistory(); const n = parseTypeImport(text) || importAnyText(text);
     renderProgress(); renderRank();
-    alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした（見出し・月・書式を確認）');
+    alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした');
   });
   $('#importFile').addEventListener('change',async (e)=>{
-    if(showAll){ alert('全科目（一覧）では取込できません。科目を選んでください。'); e.target.value=''; return; }
-    const f=e.target.files?.[0]; if(!f) return;
-    const txt=await f.text();
-    pushHistory();
-    const n= importAnyText(txt);
-    renderProgress(); renderRank();
-    alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした（見出し・当月か要確認）');
+    if(showAll){ alert('全科目（一覧）では取込不可。科目を選んでください。'); e.target.value=''; return; }
+    const f=e.target.files?.[0]; if(!f) return; const txt=await f.text();
+    pushHistory(); const n= importAnyText(txt);
+    renderProgress(); renderRank(); alert(n?`当月に ${n} 件反映しました`:'反映対象が見つかりませんでした');
     e.target.value='';
   });
   $('#importImg').addEventListener('change',async (e)=>{
-    if(showAll){ alert('全科目（一覧）では取込できません。科目を選んでください。'); e.target.value=''; return; }
+    if(showAll){ alert('全科目（一覧）では取込不可。科目を選んでください。'); e.target.value=''; return; }
     const f=e.target.files?.[0]; if(!f) return;
     try{
       const text = await ocrImage(f);
-      pushHistory();
-      const n = importAnyText(text) || parseTypeImport(text||'');
+      pushHistory(); const n = importAnyText(text) || parseTypeImport(text||'');
       renderProgress(); renderRank();
       alert(n?`OCR取込で当月に ${n} 件反映しました`:'文字が認識できないか、当月データが見つかりませんでした');
-    }catch(err){
-      alert('OCRに失敗しました。画像の鮮明さ・照明・傾きを確認してください。');
-    }finally{ e.target.value=''; }
+    }catch(_){ alert('OCRに失敗しました。画像の鮮明さ・照明・傾きを確認してください。'); }
+    finally{ e.target.value=''; }
   });
 
-  // Undo/Redo/全削除
-  $('#undoP').onclick = $('#undoC').onclick = $('#undoT').onclick = ()=>{ undo(); setTimeout(scrollTodayIntoView,0); };
-  $('#redoP').onclick = $('#redoC').onclick = $('#redoT').onclick = ()=>{ redo(); setTimeout(scrollTodayIntoView,0); };
-  $('#wipeP').onclick = ()=>{ if(confirm((showAll?'全科目の今月行をすべて初期化します。':'当月の進捗を初期化します。')+'よろしいですか？')){
+  // Undo/Redo（P/C/T/S）
+  $('#undoP').onclick = $('#undoC').onclick = $('#undoT').onclick = $('#undoS').onclick = ()=>{ undo(); setTimeout(scrollTodayIntoView,0); };
+  $('#redoP').onclick = $('#redoC').onclick = $('#redoT').onclick = $('#redoS').onclick = ()=>{ redo(); setTimeout(scrollTodayIntoView,0); };
+  $('#wipeP').onclick = ()=>{ if(confirm((showAll?'全科目の今月行を初期化します。':'当月の進捗を初期化します。')+'\nよろしいですか？')){
       pushHistory();
       if(showAll){
         subjects.forEach(sub=>{
@@ -1296,19 +1213,13 @@
   $('#wipeC').onclick = ()=>{ if(confirm('Cページの発話状態をリセットしますか？')){ recentLines.length=0; lastSpokenAt.clear(); buildClassroom(); } };
   $('#wipeT').onclick = ()=>{ if(confirm('ランキング表示を再計算しますか？')){ renderRank(); } };
 
-  // Page4 undo/redo
-  $('#undoS').addEventListener('click', undoLines);
-  $('#redoS').addEventListener('click', redoLines);
-  $('#wipeS').addEventListener('click',()=>{
-    if(!confirm('全員のセリフを空にします。よろしいですか？')) return;
-    pushLines(); customLines={}; saveCustomLines(); renderEditPage();
-  });
-
-  // 🐹ホーム
+  // 🐹＝ホーム＆今日へ
   $('#fabHome').addEventListener('click',()=>{ showPage('progress'); setTimeout(scrollTodayIntoView,0); });
 
-  // R＝強制リロード
-  $('#reloadBtn').addEventListener('click',()=>{ const url = location.pathname + '?r=' + Date.now(); location.replace(url); });
+  // R＝強制リロード（キャッシュバイパス）
+  $('#reloadBtn').addEventListener('click',()=>{
+    const url = location.pathname + '?r=' + Date.now(); location.replace(url);
+  });
 
   // ②ページ 速さ%増し
   (function initBoost(){
@@ -1318,50 +1229,56 @@
     updateBoostHint();
   })();
   function updateBoostHint(){ const v = getBoost(); $('#boostHint').textContent = `（現在: ${v}%増し / 間隔と吹き出し時間を短縮）`; }
-  $('#applyBoost').addEventListener('click',()=>{ const v = getBoost(); localStorage.setItem(BOOST_KEY, String(v)); updateBoostHint(); restartClassTicker(); });
-  $('#boostInput').addEventListener('change',()=>{ const v = getBoost(); localStorage.setItem(BOOST_KEY, String(v)); updateBoostHint(); restartClassTicker(); });
+  $('#applyBoost').addEventListener('click',()=>{
+    const v = getBoost(); localStorage.setItem(BOOST_KEY, String(v)); updateBoostHint(); restartClassTicker();
+  });
+  $('#boostInput').addEventListener('change',()=>{
+    const v = getBoost(); localStorage.setItem(BOOST_KEY, String(v)); updateBoostHint(); restartClassTicker();
+  });
 
-  // 科目UI
-  function setShowAll(v){ showAll=!!v; $('#toggleAllBtn').classList.toggle('active', showAll); renderProgress(); }
-  $('#toggleAllBtn').addEventListener('click',()=>{ pushHistory(); setShowAll(!showAll); });
+  // 席替え/整列
+  $('#shuffleSeat').addEventListener('click',()=>{ layoutMode='shuffle'; buildClassroom(); });
+  $('#toggleLayout').addEventListener('click',()=>{ layoutMode=(layoutMode==='MFM'?'shuffle':'MFM'); buildClassroom(); });
+
+  // 全科目ボタン
+  function highlightAllToggle(){ $('#allIcon').textContent = showAll? '📖':'📚'; $('#toggleAllBtn').classList.toggle('primary', showAll); }
+  $('#toggleAllBtn').addEventListener('click',()=>{ pushHistory(); showAll=!showAll; renderProgress(); highlightAllToggle(); });
+
+  // 科目選択
   $('#addSubject').addEventListener('click',()=>{
     const name = prompt('追加する科目名（例：英語）'); if(!name) return;
     const trimmed = name.trim(); if(!trimmed) return;
     if(subjects.includes(trimmed)){ alert('その科目はすでにあります'); return; }
     subjects.push(trimmed); saveSubjects(); renderSubjectSelect();
-    subject = trimmed; setShowAll(false); renderProgress();
+    subject = trimmed; showAll=false; renderProgress();
   });
-  $('#subjectSelect').addEventListener('change', e=>{ pushHistory(); subject = e.target.value; setShowAll(false); renderProgress(); });
+  $('#subjectSelect').addEventListener('change', e=>{ pushHistory(); subject = e.target.value; showAll=false; renderProgress(); });
 
-  // 科目カラー操作
-  function applyPreset(p){ const th=themeFor(subject); const cfg={hex:PRESETS[p].hex, accent:PRESETS[p].accent, tint:th.tint||12}; setTheme(subject,cfg); renderProgress(); }
-  $('#presetRedSox').addEventListener('click',()=>applyPreset('RedSox'));
-  $('#presetBlueJays').addEventListener('click',()=>applyPreset('BlueJays'));
-  $('#presetDodgers').addEventListener('click',()=>applyPreset('Dodgers'));
-  $('#presetNL').addEventListener('click',()=>applyPreset('NL'));
-  $('#applyTheme').addEventListener('click',()=>{
-    const hex = ($('#hexColor').value||$('#customColor').value||'#2d3748').trim();
-    const ok = /^#?[0-9a-fA-F]{6}$/.test(hex);
-    const use = hex.startsWith('#')?hex:('#'+hex);
-    const tint = +$('#tintRange').value||12;
-    if(!ok){ alert('カラーは #RRGGBB で入力してね'); return; }
-    const th=themeFor(subject);
-    setTheme(subject,{hex:use, accent:th.accent||use, tint});
-    renderProgress();
+  // カラープリセット
+  const PRESETS = {
+    redsox:  {hex:'#BD3039', tint:18},           // Boston Red Sox (red)
+    bluejays:{hex:'#134A8E', tint:18},           // Toronto Blue Jays (royal blue)
+    dodgers: {hex:'#005A9C', tint:16},           // LA Dodgers (dodger blue/navy)
+    nl:      {hex:'#13274F', tint:14},           // NL All-Star 風ネイビー
+  };
+  document.querySelectorAll('.preset').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const key=btn.dataset.preset; const p=PRESETS[key];
+      $('#colorPicker').value = p.hex; $('#tintRange').value = p.tint;
+    });
   });
-  $('#customColor').addEventListener('input',e=>{ $('#hexColor').value = e.target.value; });
+  $('#applyColor').addEventListener('click',()=>{
+    const hex = ($('#colorPicker').value||'').trim();
+    const tint = +$('#tintRange').value||18;
+    if(!/^#?[0-9a-fA-F]{6}$/.test(hex)){ alert('HEXカラーを #RRGGBB で入力してください'); return; }
+    const hx = hex.startsWith('#')? hex : ('#'+hex);
+    subjectColors[subject] = {hex:hx, tint: Math.max(0,Math.min(90,tint))};
+    saveSubjectColors(); renderProgress();
+  });
 
-  // 席替え
-  $('#shuffleSeats').addEventListener('click',()=> buildClassroom(true));
-
-  // 時間割：パネル開閉
-  $('#ttToggle').addEventListener('click',()=> $('#ttBox').classList.toggle('open'));
-  $('#ttClose').addEventListener('click',()=> $('#ttBox').classList.remove('open'));
-
-  // 初期化
+  /* ===================== Init ===================== */
   function renderAll(){
     renderSubjectSelect();
-    $('#toggleAllBtn').classList.toggle('active', showAll);
     const p1 = $('#pageProgress').style.display!=='none';
     const p2 = $('#pageClass').style.display!=='none';
     const p3 = $('#pageRank').style.display!=='none';
@@ -1370,6 +1287,7 @@
     if(p2) { buildClassroom(); restartClassTicker(); }
     if(p3) renderRank();
     if(p4) renderEditPage();
+    highlightAllToggle();
   }
   (function init(){
     renderSubjectSelect();
