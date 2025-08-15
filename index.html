@@ -87,25 +87,31 @@
 
   .blackboard{border-radius:10px;border:2px solid #2f4f4f;background:#0f3b3f;color:#e0f2f1;padding:10px 12px;font-weight:600;margin-bottom:10px}
   .room{border:1px solid var(--line);border-radius:12px;padding:14px;background:#f7fafc;max-height:80vh;overflow:auto}
-  .desks{display:grid;gap:12px;grid-template-columns:repeat(3, minmax(0,1fr))}
-  .desk{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;min-height:110px;display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden}
+  .desks{display:grid;gap:10px;grid-template-columns:repeat(3, minmax(0,1fr))}
+  .desk{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;min-height:100px;display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden}
   .desk .name{font-weight:700}
   .desk .role{font-size:12px;color:#6b7280}
   .desk.male .name{color:var(--male)}
   .desk.female .name{color:var(--female)}
+  .desk::before{
+    content:"";position:absolute;inset:0;border-radius:12px;
+    background:linear-gradient(180deg,#fdfdfd, #f3f6fb);
+    opacity:.4;pointer-events:none;
+  }
 
   .bubble{
-    position:absolute;left:8px;right:8px;top:8px;
+    position:absolute;left:6px;right:6px;top:6px;
     border:1px solid var(--bubble-gen-bd);background:var(--bubble-gen-bg);
     border-radius:12px;padding:8px 10px;font-size:14px;box-shadow:0 6px 12px rgba(0,0,0,.06);
-    display:none;max-width:unset;white-space:pre-line
+    display:none;max-width:unset;white-space:pre-line;z-index:2
   }
   .bubble::after{content:"";position:absolute;left:22px;bottom:-10px;border-width:10px 10px 0 10px;border-style:solid;border-color:var(--bubble-gen-bd) transparent transparent transparent}
   .bubble::before{content:"";position:absolute;left:22px;bottom:-9px;border-width:9px 9px 0 9px;border-style:solid;border-color:var(--bubble-gen-bg) transparent transparent transparent}
   .bubble.famous{background:var(--bubble-fam-bg);border-color:var(--bubble-fam-bd)}
   .bubble.famous::after{border-top-color:var(--bubble-fam-bd)}
   .bubble.famous::before{border-top-color:var(--bubble-fam-bg)}
-  .bubble.show{display:block;animation:fadeIn .15s ease}
+  .bubble.huge{font-size:24px;font-weight:800;line-height:1.2;left:-6px;right:-6px;top:-6px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+  .bubble.show{display:block;animation:fadeIn .12s ease}
   @keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 
   .rank-card{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff}
@@ -244,10 +250,11 @@
 
   <!-- ===== Page 2: クラスメート ===== -->
   <section id="pageClass" style="display:none">
-    <div class="ops">
+    <div class="ops" style="flex-wrap:wrap">
       <button id="undoC">戻る</button>
       <button id="redoC">進む</button>
       <button id="wipeC">全削除</button>
+      <button id="shuffleSeats">🔁 席替え</button>
     </div>
     <div class="blackboard">
       1年B組 – クラスメートが「<span id="meOnBoard">橋本淑雅</span>」を応援中！
@@ -255,6 +262,7 @@
       <input id="boostInput" type="number" min="0" step="1" value="0" title="例: 13 → 13%速く">
       <button id="applyBoost">適用</button>
       <span id="boostHint" class="muted"></span>
+      <span class="muted" style="margin-left:10px">※たまに“ドカン”と大声（巨大吹き出し）</span>
     </div>
     <div class="room">
       <div class="desks" id="desks"></div>
@@ -303,6 +311,7 @@
   const BOOST_KEY='studyplanner.v15.classBoost';
   const SUBJ_KEY='studyplanner.v15.subjects';
   const TT_KEY='studyplanner.v15.tt'; // 時間割
+  const SEATS_KEY='studyplanner.v15.seatOrder'; // 席順保存
 
   let year=(new Date()).getFullYear(), month=(new Date()).getMonth();
   let rows=[]; // 現在のUIで編集中の配列（科目または全科目）
@@ -447,7 +456,7 @@
     const tb=$('#tbody'); tb.innerHTML='';
     const todayStr=ymd(new Date());
 
-    // 全科目ビューなら “各日×各科目” を全て出す（行数は増えるが把握しやすい）
+    // 全科目ビューなら “各日×各科目” を全て出す
     let list=[];
     if(showAll){
       const needDays=monthDates(year,month);
@@ -571,7 +580,6 @@
       if(!/^(学習|休日|復習)$/.test(typ)) continue;
       if(dtk.y!==year || dtk.mo!==month) continue;
 
-      // 全科目ビューでは貼り付け不可（どの科目か特定できない）
       if(showAll){ alert('全科目（一覧）では貼り付け取込はできません。科目を選択してから実行してください。'); return 0; }
 
       const ds = ymd(new Date(dtk.y, dtk.mo, dtk.d));
@@ -704,7 +712,6 @@
   /* ========== Page3: ランキング ========== */
   function myMonthlyPoints(){
     let total=0;
-    // 全科目は現在科目でカウント（※必要なら全科目合算に変更可）
     const base = loadSubjectMonth(subject);
     monthDates(year,month).forEach(date=>{
       const r=base.find(x=>x.date===date); if(!r) return;
@@ -764,6 +771,81 @@
     '望月亜希子'
   ]);
 
+  // ---- 超ランダム発話ジェネレータ（編集が無ければ動作） ----
+  const TOPIC_WORDS = {
+    study: ['暗記カード','過去問','アウトプット','能動学習','5分ルール'],
+    history: ['産業革命','ルネサンス','宗教改革','幕末維新','冷戦','シルクロード','オスマン帝国'],
+    religion: ['世界宗教','宗教寛容','宗教画のモチーフ','祈りの形','宗教史の用語'],
+    news: ['宇宙探査','AI研究','防災訓練','スポーツ大会','環境保全','海洋探索'],
+    otaku: ['アニメ一気見','推し活','コミケ新刊','ゲームの実績解除','フィギュア棚'],
+    variety: ['ツッコミ待ち','大喜利','モノマネ','早口言葉','脳トレ'],
+    life: ['姿勢伸ばす','水分補給','軽くストレッチ','深呼吸3回','5分散歩'],
+  };
+  const EMOJIS = ['💪','✨','🔥','📚','📝','📣','🧠','🎮','🎧','🗺️','🎯','⏱️','🌟','🧩','🎉'];
+
+  function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+  function maybeEmoji(){ return Math.random()<0.6 ? ' '+pick(EMOJIS) : ''; }
+
+  // プレースホルダ付きテンプレ
+  const TEMPLATES = [
+    // study
+    'まずは{subject}の{study}からウォームアップ！{emoji}',
+    '{subject}、区切ってやろ。25分集中→5分休憩！{emoji}',
+    '分からん所は“自分の言葉”で言い換え！{emoji}',
+    // history
+    '{subject}つながりで{history}を地図で追ってみよ！{emoji}',
+    '{history}は因果関係メモるとスッと入るぞ{emoji}',
+    // religion（中立・学術文脈）
+    '用語を3つ自分の言葉で：{religion} {emoji}',
+    '宗教史の比較表つくる？共通点と相違点！{emoji}',
+    // news（無難な一般話題）
+    'ニュース一分だけチェック→{news}が話題だって。終わったら勉強戻ろ！{emoji}',
+    // otaku / variety
+    '{otaku}は勉強終わってからのご褒美にキープ！{emoji}',
+    '今の問題、ツッコミどころどこ？要点を一行で！{emoji}',
+    // life
+    '肩まわしてリフレッシュ→再開！{emoji}',
+    'タイマーON。まずは5分だけ手を動かそ！{emoji}',
+    // 汎用応援
+    'いい流れきてる。その調子！{emoji}',
+    '間違い＝伸びしろ。メモって次で回収！{emoji}',
+  ];
+
+  function generateLine(name){
+    // テンプレにランダムに語を差し込む
+    const s = {
+      subject,
+      study: pick(TOPIC_WORDS.study),
+      history: pick(TOPIC_WORDS.history),
+      religion: pick(TOPIC_WORDS.religion),
+      news: pick(TOPIC_WORDS.news),
+      otaku: pick(TOPIC_WORDS.otaku),
+      variety: pick(TOPIC_WORDS.variety),
+      life: pick(TOPIC_WORDS.life),
+      emoji: maybeEmoji(),
+      name,
+    };
+    let t = pick(TEMPLATES);
+    t = t.replace('{subject}', s.subject)
+         .replace('{study}', s.study)
+         .replace('{history}', s.history)
+         .replace('{religion}', s.religion)
+         .replace('{news}', s.news)
+         .replace('{otaku}', s.otaku)
+         .replace('{emoji}', s.emoji)
+         .replace('{name}', s.name);
+    // たまに完全フリーテキスト
+    if(Math.random()<0.18){
+      const free = [
+        `「${s.subject}」3分で要約→音読→もう1回！${maybeEmoji()}`,
+        `チェックポイント：用語→因果→地図→年表 の順で整理！${maybeEmoji()}`,
+        `自分に実況中継：「今なにしてる？」→「次なにする？」${maybeEmoji()}`,
+      ];
+      t = pick(free);
+    }
+    return t;
+  }
+
   const BASE_GENERAL = [
     '今日も一歩ずつ！','その調子！','休憩も忘れずに','昨日の復習いこ！',
     '目標メモした？','終わったら＋10ptだ！','分からない所は付箋！',
@@ -771,6 +853,7 @@
   ];
   const defaultLines = {}; CLASSMATES.forEach(n=>{ defaultLines[n] = []; });
 
+  // 4ページで書いたら“それだけを使う”／未設定なら上のジェネレータで無限バリエーション
   let customLines = loadCustomLines();
   function loadCustomLines(){ try{ const raw=localStorage.getItem(LINES_KEY); return raw? JSON.parse(raw): {}; }catch(_){ return {}; } }
   let lineAutosaveTimer=null;
@@ -780,23 +863,28 @@
   function getLinesFor(name){
     if(Object.prototype.hasOwnProperty.call(customLines, name)){
       const arr = Array.isArray(customLines[name]) ? customLines[name] : [];
-      return arr;
+      return arr; // 空配列=ミュート
     }
-    const base = (defaultLines[name] && defaultLines[name].length ? defaultLines[name] : BASE_GENERAL);
-    return base.slice();
+    // 未設定＝ジェネレータを使うので固定配列は返さない
+    return null; // null → 動的生成モード
   }
 
   const recentLines = [];
   function lineFor(name){
     const pool = getLinesFor(name);
-    if(!pool.length) return null;
+    if(pool===null){
+      // 動的生成（超ランダム）
+      const msg = generateLine(name);
+      return msg;
+    }
+    if(!pool.length) return null; // ミュート
     let msg = pool[Math.floor(Math.random()*pool.length)];
     let guard = 0;
     while(recentLines.includes(msg) && guard++<6){
       msg = pool[Math.floor(Math.random()*pool.length)];
     }
     recentLines.push(msg);
-    if(recentLines.length>12) recentLines.shift();
+    if(recentLines.length>20) recentLines.shift();
     return msg;
   }
 
@@ -804,25 +892,45 @@
   function factorFromBoost(boostPct){ const k = Math.max(0, Number(boostPct)||0); return 1 / (1 + k/100); }
   function getBoost(){ const v = Number($('#boostInput').value)||0; return Math.max(0, v); }
 
-  // 複数人同時発言
+  // 複数人同時発言（ガヤ度UP：ジッター＆同時数のばらつき大きめ）
   let classTicker = null;
   const lastSpokenAt = new Map();
-  function visibleDurationMs(){ return Math.round(3000 * factorFromBoost(getBoost())); }
-  function cooldownMs(){ return Math.max(800, Math.round(visibleDurationMs()*0.9)); }
-  function baseTickMs(){ return Math.max(200, Math.round(1200 * factorFromBoost(getBoost()))); }
-  function randomEmissionCount(){ const r=Math.random(); if(r<0.20) return 0; if(r<0.60) return 1; if(r<0.90) return 2; if(r<0.98) return 3; return 4; }
+  function visibleDurationMs(){ return Math.round((2200 + Math.random()*1600) * factorFromBoost(getBoost())); }
+  function cooldownMs(){ return Math.max(700, Math.round(visibleDurationMs()*0.9)); }
+  function baseTickMs(){ const base = 900 + Math.random()*1000; return Math.max(160, Math.round(base * factorFromBoost(getBoost()))); }
+  function randomEmissionCount(){
+    // 0〜5人。たまに“ドカン”で4-5人
+    const r=Math.random();
+    if(r<0.15) return 0;
+    if(r<0.45) return 1;
+    if(r<0.75) return 2;
+    if(r<0.92) return 3;
+    if(r<0.985) return 4;
+    return 5;
+  }
 
   function showBubble(deskEl, name){
     const bubble = deskEl.querySelector('.bubble'); if(!bubble) return;
     const msg = lineFor(name); if(msg === null){ bubble.classList.remove('show'); return; }
     const isFamous = FAMOUS_SET.has(name);
-    bubble.className = 'bubble' + (isFamous ? ' famous' : '');
+
+    // たまに“巨大に叫ぶ”
+    const shout = Math.random()<0.14;
+    bubble.className = 'bubble' + (isFamous ? ' famous' : '') + (shout ? ' huge' : '');
     bubble.textContent = msg;
     bubble.classList.add('show');
-    const vms = visibleDurationMs();
+    const vms = visibleDurationMs() * (shout? 1.2 : 1);
     setTimeout(()=> bubble.classList.remove('show'), vms);
     lastSpokenAt.set(name, Date.now());
   }
+
+  // ===== 席配置（男・女・男の列を維持しつつ席替え） =====
+  const seatStore = {
+    load(){
+      try{ const raw = localStorage.getItem(SEATS_KEY); return raw? JSON.parse(raw): null; }catch(_){ return null; }
+    },
+    save(order){ try{ localStorage.setItem(SEATS_KEY, JSON.stringify(order)); }catch(_){} }
+  };
 
   function arrangeNamesMFM(){
     const males = CLASSMATES.filter(n=>!FEMALES.has(n));
@@ -841,9 +949,42 @@
     return arranged;
   }
 
+  function shuffleArray(a){
+    for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+    return a;
+  }
+
+  function seatOrderMake(){
+    // 男・女・男の3列を保ったまま、それぞれ内部をシャッフル
+    const males = CLASSMATES.filter(n=>!FEMALES.has(n));
+    const females = CLASSMATES.filter(n=>FEMALES.has(n));
+    shuffleArray(males); shuffleArray(females);
+    const half = Math.ceil(males.length/2);
+    const col1 = males.slice(0, half);
+    const col3 = males.slice(half);
+    const col2 = females.slice();
+    const rows = Math.max(col1.length, col2.length, col3.length);
+    const out=[];
+    for(let i=0;i<rows;i++){
+      if(col1[i]) out.push(col1[i]);
+      if(col2[i]) out.push(col2[i]);
+      if(col3[i]) out.push(col3[i]);
+    }
+    return out;
+  }
+
+  function currentSeatOrder(){
+    const saved = seatStore.load();
+    if(saved && Array.isArray(saved) && saved.length===CLASSMATES.length){ return saved; }
+    // 既定のM/F/M整列
+    const arr = arrangeNamesMFM();
+    seatStore.save(arr);
+    return arr;
+  }
+
   function buildClassroom(){
     const desks=$('#desks'); if(!desks) return; desks.innerHTML='';
-    const names = arrangeNamesMFM();
+    const names = currentSeatOrder();
     names.forEach((name)=>{
       const d=document.createElement('div'); d.className='desk';
       d.classList.add(FEMALES.has(name)?'female':'male');
@@ -865,7 +1006,10 @@
     const candidates = desks
       .map(el=>({el, name: el.querySelector('.name')?.textContent || ''}))
       .filter(x=>x.name && (!lastSpokenAt.has(x.name) || (now - (lastSpokenAt.get(x.name)||0) > cooldownMs())))
-      .filter(x=> (getLinesFor(x.name).length>0));
+      .filter(x=> {
+        const pool = getLinesFor(x.name);
+        return pool===null || (Array.isArray(pool) && pool.length>0);
+      });
 
     if(candidates.length===0) return;
 
@@ -880,6 +1024,13 @@
   function stopClassTicker(){ if(classTicker){ clearInterval(classTicker); classTicker=null; } }
   function restartClassTicker(){ stopClassTicker(); startClassTicker(); }
 
+  // 席替え
+  $('#shuffleSeats').addEventListener('click',()=>{
+    const order = seatOrderMake();
+    seatStore.save(order);
+    buildClassroom();
+  });
+
   /* ========== Page4: セリフ編集UI ========== */
   function renderEditPage(){
     const grid = $('#editGrid'); if(!grid) return;
@@ -888,14 +1039,14 @@
       const card = document.createElement('div');
       card.className='card';
       const id = 'ta_'+btoa(unescape(encodeURIComponent(name))).replace(/=+/g,'');
-      const lines = getLinesFor(name);
-      const text = (Object.prototype.hasOwnProperty.call(customLines, name) ? customLines[name] : lines).join('\n');
+      const pool = getLinesFor(name);
+      const text = Array.isArray(pool) ? pool.join('\n') : ''; // 未設定なら空（＝動的ジェネレーターが使われる）
       card.innerHTML = `
         <h4>${name}</h4>
-        <textarea id="${id}" placeholder="1行=1セリフ。空にするとミュート">${escapeHtml(text)}</textarea>
+        <textarea id="${id}" placeholder="1行=1セリフ。空＝デフォルト（超ランダム）、空配列＝ミュート">${escapeHtml(text)}</textarea>
         <div class="row">
           <button data-name="${name}" class="btnClear">ミュート（空にする）</button>
-          <span class="muted">現在 ${lines.length} 件</span>
+          <span class="muted">※空欄にすると“超ランダム”に戻ります</span>
         </div>
       `;
       grid.appendChild(card);
@@ -903,11 +1054,12 @@
       ta.addEventListener('input',()=>{
         const v = String(ta.value||'');
         const arr = v.split('\n').map(s=>s.trim()).filter(s=>s.length>0);
-        customLines[name] = arr;
+        if(v.trim()===''){ delete customLines[name]; } // 空＝デフォルトに戻す
+        else{ customLines[name] = arr; }
         scheduleLinesSave();
       });
       card.querySelector('.btnClear').addEventListener('click',()=>{
-        customLines[name] = [];
+        customLines[name] = []; // ミュート
         const ta2 = card.querySelector('textarea'); ta2.value='';
         scheduleLinesSave();
       });
@@ -976,7 +1128,6 @@
       row.querySelector('[data-act="down"]').addEventListener('click',()=>{ if(idx<data.length-1){ const t=data[idx+1]; data[idx+1]=data[idx]; data[idx]=t; saveTT(subject, data); renderTimetable(); }});
       $('#ttRows').appendChild(row);
     });
-    // 全科目モードでは編集をロック
     $('#ttAddRow').disabled = showAll;
     $('#ttShuffle').disabled = showAll;
   }
@@ -986,7 +1137,6 @@
     saveTT(subject, data); renderTimetable();
   });
   $('#ttShuffle').addEventListener('click',()=>{
-    // ルールベースの簡易自動割当：本日（当月&今日以降）から未完了の goal/review を拾って時間枠に入れる
     const data = loadTT(subject);
     if(data.length===0){ alert('先に時間枠（開始/終了）を作ってください'); return; }
     const today = new Date();
@@ -994,7 +1144,7 @@
     const base = loadSubjectMonth(subject);
     const todo = [];
     base.forEach(r=>{
-      if(r.date>=todayYmd && r.color!=='gray'){ // 未完了
+      if(r.date>=todayYmd && r.color!=='gray'){
         if(r.goal) todo.push(r.goal);
         if(r.review) todo.push('復習: '+r.review);
       }
@@ -1153,7 +1303,7 @@
   })();
   function updateBoostHint(){
     const v = getBoost();
-    $('#boostHint').textContent = `（現在: ${v}%増し / 間隔と吹き出し時間を短縮）`;
+    $('#boostHint').textContent = `（現在: ${v}%増し / 発言間隔・表示時間とも短縮）`;
   }
   $('#applyBoost').addEventListener('click',()=>{
     const v = getBoost();
@@ -1182,7 +1332,6 @@
     if(p4) renderEditPage();
   }
   (function init(){
-    // 旧キー移行（科目なし旧形式はスキップ）
     renderSubjectSelect();
     load(); renderProgress(); document.body.classList.add('compact'); renderRank();
     setTimeout(scrollTodayIntoView,0);
