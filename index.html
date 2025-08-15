@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Study Planner – v17b</title>
+<title>Study Planner – v17.3</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 <style>
   :root{
@@ -51,7 +51,6 @@
   tr:hover td{background:#f9fafb}
   tr.today td{background:var(--today-bg)!important;color:var(--today-text)!important}
   .done-row td{background:var(--doneTint)!important;color:#111!important}
-  .tinted td{background:var(--tint)!important}
 
   .col-date{width:160px}
   .col-type{width:160px}
@@ -59,6 +58,8 @@
   .col-donebtn{width:120px}
   .cell{display:flex;align-items:center;gap:8px}
   .type-buttons .chip{min-width:68px;text-align:center}
+
+  .tinted td{background:var(--tint) !important}
 
   .fab{
     position:fixed;z-index:5;width:54px;height:54px;border-radius:50%;
@@ -134,7 +135,7 @@
 </head>
 <body>
   <h1>
-    学習計画（1ヶ月表示 v17b）
+    学習計画（1ヶ月表示 v17.3）
     <button id="reloadBtn" class="pill" title="強制リロード">R</button>
   </h1>
 
@@ -153,6 +154,11 @@
 
   <!-- ===== Page 1: 進捗 ===== -->
   <section id="pageProgress" style="display:block">
+    <!-- ←← 追加：最終更新表示 -->
+    <div class="topbar" style="margin-bottom:4px">
+      <span class="muted" id="lastUpdatedLabel">最終更新: —</span>
+    </div>
+
     <div class="ops">
       <button id="undoP">戻る</button>
       <button id="redoP">進む</button>
@@ -325,7 +331,7 @@
   'use strict';
 
   /* ===== Keys ===== */
-  const NS='studyplanner.v17b';
+  const NS='studyplanner.v17';
   const NAME_KEY   = `${NS}.displayName`;
   const SUBJ_KEY   = `${NS}.subjects`;
   const COL_KEY    = `${NS}.subjectColors`;
@@ -337,6 +343,8 @@
   const DP_KEY     = `${NS}.dailyPoints`;
   const PEOPLE_KEY = `${NS}.people`;
   const BOOST_KEY  = `${NS}.classBoost`;
+  // 追加：最終更新のキー
+  const LAST_KEY   = `${NS}.lastUpdated`;
 
   /* ===== State ===== */
   let year=(new Date()).getFullYear(), month=(new Date()).getMonth();
@@ -373,6 +381,25 @@
   }
   function tintCss(hex, percent){ const m=hex.replace('#',''); const r=parseInt(m.slice(0,2),16), g=parseInt(m.slice(2,4),16), b=parseInt(m.slice(4,6),16); const a=Math.max(0,Math.min(1,percent/100)); return `rgba(${r},${g},${b},${a})`; }
 
+  // 最終更新表示ユーティリティ
+  function pad2(n){ return String(n).padStart(2,'0'); }
+  function formatDateTime(d){
+    return `${d.getFullYear()}/${pad2(d.getMonth()+1)}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+  }
+  function setLastUpdated(){
+    try{ localStorage.setItem(LAST_KEY, String(Date.now())); }catch(_){}
+    updateLastUpdatedLabel();
+  }
+  function getLastUpdated(){
+    const v = Number(localStorage.getItem(LAST_KEY));
+    return (isFinite(v) && v>0) ? new Date(v) : null;
+  }
+  function updateLastUpdatedLabel(){
+    const el = $('#lastUpdatedLabel'); if(!el) return;
+    const t = getLastUpdated();
+    el.textContent = '最終更新: ' + (t ? formatDateTime(t) : '—');
+  }
+
   /* ===== Subjects & Colors ===== */
   function loadSubjects(){ try{ const raw=localStorage.getItem(SUBJ_KEY); const arr = raw? JSON.parse(raw): null; return (Array.isArray(arr)&&arr.length)?arr:['世界史','英語','数学']; }catch(_){ return ['世界史','英語','数学']; } }
   function saveSubjects(){ try{ localStorage.setItem(SUBJ_KEY, JSON.stringify(subjects)); }catch(_){} }
@@ -382,9 +409,9 @@
   function colorFor(subj){
     const c = subjectColors[subj];
     if(c && c.hex){ return {hex:c.hex, tint: Math.max(0,Math.min(95,c.tint??20))}; }
-    if(/英語/.test(subj)) return {hex:'#BD3039', tint:20};   // Red Sox
-    if(/数学/.test(subj)) return {hex:'#134A8E', tint:20};   // Blue Jays
-    if(/世界史/.test(subj)) return {hex:'#005A9C', tint:18}; // Dodgers
+    if(/英語/.test(subj)) return {hex:'#BD3039', tint:20};
+    if(/数学/.test(subj)) return {hex:'#134A8E', tint:20};
+    if(/世界史/.test(subj)) return {hex:'#005A9C', tint:18};
     return {hex:'#2563eb', tint:16};
   }
   function loadDoneColor(){ try{ const raw=localStorage.getItem(DONE_KEY); return raw? JSON.parse(raw): {hex:'#B0A89F', tint:34}; }catch(_){ return {hex:'#B0A89F', tint:34}; } }
@@ -403,20 +430,30 @@
   let autoSaveTimer=null;
   function touch(){
     if(autoSaveTimer) clearTimeout(autoSaveTimer);
-    autoSaveTimer=setTimeout(()=>{ persistAll(); autoSaveTimer=null; }, 600);
+    autoSaveTimer=setTimeout(()=>{
+      if(showAll){
+        const map = new Map();
+        rows.forEach(r=>{ const subj=r._subject||subject; if(!map.has(subj)) map.set(subj,[]); map.get(subj).push(stripSubject(r)); });
+        map.forEach((arr,subj)=> doSaveToLocal(subj, arr));
+      }else{
+        doSaveToLocal(subject, rows);
+      }
+      setLastUpdated(); // ★ オートセーブ完了 → 最終更新更新
+      autoSaveTimer=null;
+    }, 600);
   }
-  function persistAll(){
+  function flushAutoSave(){
+    if(autoSaveTimer){ clearTimeout(autoSaveTimer); autoSaveTimer=null; }
     if(showAll){
-      const map = new Map();
+      const map=new Map();
       rows.forEach(r=>{ const subj=r._subject||subject; if(!map.has(subj)) map.set(subj,[]); map.get(subj).push(stripSubject(r)); });
       map.forEach((arr,subj)=> doSaveToLocal(subj, arr));
-    }else{
+    } else {
       doSaveToLocal(subject, rows);
     }
+    setLastUpdated(); // ★ フラッシュ保存でも更新
   }
-  function flushAutoSave(){ if(autoSaveTimer){ clearTimeout(autoSaveTimer); autoSaveTimer=null; } persistAll(); }
   window.addEventListener('beforeunload', flushAutoSave);
-  window.addEventListener('visibilitychange', ()=>{ if(document.hidden) flushAutoSave(); });
   function stripSubject(r){ const { _subject, ...rest } = r; return rest; }
 
   function load(){ if(showAll){ const merged=[]; subjects.forEach(sub=>{ const arr=loadSubjectMonth(sub); arr.forEach(r=> merged.push({...r,_subject:sub})); }); rows=merged.sort((a,b)=> a.date===b.date? (a._subject||'').localeCompare(b._subject||'') : a.date.localeCompare(b.date)); } else { rows=loadSubjectMonth(subject); } return true; }
@@ -462,12 +499,13 @@
   }
   function saveCustomLines(){ try{ localStorage.setItem(LINES_KEY, JSON.stringify(customLines)); }catch(_){} }
   let customLines = loadCustomLines();
-  let lineAutosaveTimer=null; const scheduleLinesSave=()=>{ if(lineAutosaveTimer) clearTimeout(lineAutosaveTimer); lineAutosaveTimer=setTimeout(saveCustomLines,600); };
+  let lineAutosaveTimer=null; const scheduleLinesSave=()=>{ if(lineAutosaveTimer) clearTimeout(lineAutosaveTimer); lineAutosaveTimer=setTimeout(()=>{ saveCustomLines(); setLastUpdated(); },600); };
   function getLinesFor(name){ const arr = Array.isArray(customLines[name])? customLines[name] : []; return arr.slice(); }
 
   /* ===== Page1: Render ===== */
   function renderProgress(){
     load();
+    updateLastUpdatedLabel(); // 表示を最新化
     const days = monthDates(year,month).length;
     $('#label').textContent = showAll? `全科目 ${year}年${month+1}月（${days}日）` : `${subject} — ${year}年${month+1}月（${days}日）`;
 
@@ -495,20 +533,20 @@
       const tr=document.createElement('tr');
       const isDone = (r.color==='gray') || (r.type==='休日');
       if(r.date===todayStr) tr.classList.add('today');
-      if(!isDone){ tr.classList.add('tinted'); tr.style.setProperty('--tint', themeTint); }
+      if(!showAll && !isDone){ tr.classList.add('tinted'); tr.style.setProperty('--tint', themeTint); }
       if(isDone){ tr.classList.add('done-row'); tr.style.setProperty('--doneTint', doneTint); }
 
       // 日付
       const tdDate = document.createElement('td'); tdDate.className='col-date'; tdDate.innerHTML = `<div class="cell">${jpDateLabel(r.date)}</div>`;
 
-      // 種別（学習／休日 2ボタン）
+      // 種別（学習／休日）
       const tdType = document.createElement('td'); tdType.className='col-type';
       tdType.innerHTML = `<div class="cell type-buttons">
         <button class="chip btnType ${r.type==='学習'?'active':''}" data-val="学習">学習</button>
         <button class="chip btnType ${r.type==='休日'?'active':''}" data-val="休日">休日</button>
       </div>`;
 
-      // 入力列（値は常に保持。既存の数字類は消さない）
+      // 入力列
       const tdGoal=document.createElement('td'); tdGoal.className='col-goal';
       const inGoal=document.createElement('input'); inGoal.type='text'; inGoal.placeholder='例：世界史 23〜24'; inGoal.value=(r.goal??'');
       tdGoal.appendChild(inGoal);
@@ -528,16 +566,11 @@
 
       // 反応：種別
       tdType.querySelectorAll('.btnType').forEach(btn=>{
-        btn.addEventListener('click',(ev)=>{
+        btn.addEventListener('click',()=>{
           pushHistory();
           const v=btn.dataset.val;
           r.type=v;
-          // 休日は見た目を完了色で即反映（保存も即）
-          persist(r); touch(); renderProgress();
-          // 反応が分かるようにポップ
-          const base = pointsForType(r.type||'学習');
-          showPop(ev.target, (base>0?`+${base}`:'+0'));
-          scrollTodayIntoView();
+          persist(r); touch(); renderProgress(); scrollTodayIntoView();
         });
       });
 
@@ -551,19 +584,18 @@
         showPop(ev.target, `+${base}`);
       });
 
-      // 入力変更（既存数字は保持）
+      // 入力変更
       const onInput=(field)=>(e)=>{ pushHistory(); r[field]=e.target.value; persist(r); touch(); };
       inGoal.addEventListener('input', onInput('goal'));
       inRes .addEventListener('input', onInput('result'));
       inRev .addEventListener('input', onInput('review'));
 
-      // キー移動（上下左右/Enter）
+      // キー移動
       const focusables=[inGoal,inRes,inRev,btnDone];
       focusables.forEach((el,colIndex)=>{
-        el.setAttribute('data-row-index', rowIndex);
-        el.setAttribute('data-col-index', colIndex);
+        el.dataset.rowIndex=rowIndex; el.dataset.colIndex=colIndex;
         el.addEventListener('keydown',(ev)=>{
-          const rIdx=+el.getAttribute('data-row-index'); const cIdx=+el.getAttribute('data-col-index');
+          const rIdx=+el.dataset.rowIndex, cIdx=+el.dataset.colIndex;
           let nr=rIdx, nc=cIdx;
           if(ev.key==='ArrowDown') nr=rIdx+1;
           if(ev.key==='ArrowUp')   nr=rIdx-1;
@@ -607,7 +639,7 @@
     setTimeout(()=>{ pop.remove(); }, 1200);
   }
 
-  /* ===== Import (CSV/Paste/OCR) — v17相当 ===== */
+  /* ===== Import（省略：v17と同等） ===== */
   function normalizeDateToken(raw){ if(!raw) return null; let s=String(raw).trim(); s=s.replace(/（.*?）|\(.*?\)/g,''); s=s.replace(/[．。・‒–—―〜～]/g,'-'); let m=s.match(/^(\d{4})\s*[-/]\s*(\d{1,2})\s*[-/]\s*(\d{1,2})$/); if(m) return {y:+m[1],mo:+m[2]-1,d:+m[3]}; m=s.match(/^(\d{1,2})\s*(?:\/|月)\s*(\d{1,2})/); if(m){ const y=year; return {y,mo:+m[1]-1,d:+m[2]}; } return null; }
   function clean(v){ const s=String(v??'').trim(); if(!s) return ''; if(/^(nan|null|undefined)$/i.test(s)) return ''; return s; }
   function parseDelimited(text){ if(text.charCodeAt(0)===0xFEFF) text=text.slice(1); const sep=(text.indexOf('\t')!==-1)?'\t':','; const lines=text.replace(/\r\n?/g,'\n').split('\n').filter(l=>l.trim()!==''); const header=lines[0].split(sep).map(s=>s.trim()); const rows=lines.slice(1).map(line=>{ const cells=line.split(sep); const obj={}; header.forEach((h,i)=> obj[h]=(cells[i]??'').trim()); return obj; }); return {header,rows}; }
@@ -722,14 +754,14 @@
         const newName=(nameInput.value||'').trim(); if(!newName){ nameInput.value=p.name; return; }
         if(people.some((x,ix)=> ix!==i && x.name===newName)){ alert('同名が既にあります'); nameInput.value=p.name; return; }
         customLines[newName]= (customLines[p.name]||[]); delete customLines[p.name];
-        p.name=newName; savePeople(); saveCustomLines(); renderEditPage();
+        p.name=newName; savePeople(); saveCustomLines(); setLastUpdated(); renderEditPage();
       });
-      chkFemale.addEventListener('change',()=>{ p.female=chkFemale.checked; savePeople(); });
-      chkFamous.addEventListener('change',()=>{ p.famous=chkFamous.checked; savePeople(); });
+      chkFemale.addEventListener('change',()=>{ p.female=chkFemale.checked; savePeople(); setLastUpdated(); });
+      chkFamous.addEventListener('change',()=>{ p.famous=chkFamous.checked; savePeople(); setLastUpdated(); });
 
-      const patchProfile=()=>{ p.profile.age=Number(age.value)||null; p.profile.ron=Number(ron.value)||0; p.profile.geneki=geneki.value==='1'; p.profile.quota=Number(quota.value)||0; savePeople(); };
+      const patchProfile=()=>{ p.profile.age=Number(age.value)||null; p.profile.ron=Number(ron.value)||0; p.profile.geneki=geneki.value==='1'; p.profile.quota=Number(quota.value)||0; savePeople(); setLastUpdated(); };
       [age,ron,geneki,quota].forEach(el=> el.addEventListener('change',patchProfile));
-      const patchTraits=()=>{ p.traits.tokui=tokui.value||''; p.traits.nigate=nigate.value||''; p.traits.seikaku=seikaku.value||''; savePeople(); };
+      const patchTraits=()=>{ p.traits.tokui=tokui.value||''; p.traits.nigate=nigate.value||''; p.traits.seikaku=seikaku.value||''; savePeople(); setLastUpdated(); };
       [tokui,nigate,seikaku].forEach(el=> el.addEventListener('change',patchTraits));
 
       const ta=card.querySelector('textarea');
@@ -741,7 +773,7 @@
         if(!confirm(`「${p.name}」を削除しますか？`)) return;
         pushHistory();
         people.splice(i,1); savePeople();
-        delete customLines[p.name]; saveCustomLines();
+        delete customLines[p.name]; saveCustomLines(); setLastUpdated();
         renderEditPage();
       });
     });
@@ -752,7 +784,7 @@
     if(people.some(p=>p.name===name)){ alert('同名が既にあります'); return; }
     const female = confirm('女子ですか？（OK=女子／キャンセル=男子）');
     const np={ name, female, famous:false, profile:{age:null, ron:0, geneki:true, quota:50}, traits:{tokui:'',nigate:'',seikaku:'マイペース'} };
-    people.push(np); savePeople();
+    people.push(np); savePeople(); setLastUpdated();
     customLines[name]=['一緒にがんばろう！']; saveCustomLines();
     renderEditPage();
   });
@@ -764,7 +796,7 @@
   });
   $('#importLinesFile').addEventListener('change',async(e)=>{
     const f=e.target.files?.[0]; if(!f) return;
-    try{ const txt=await f.text(); const obj=JSON.parse(txt); if(obj && typeof obj==='object'){ pushHistory(); customLines=obj; saveCustomLines(); renderEditPage(); } }
+    try{ const txt=await f.text(); const obj=JSON.parse(txt); if(obj && typeof obj==='object'){ pushHistory(); customLines=obj; saveCustomLines(); setLastUpdated(); renderEditPage(); } }
     catch(_){ alert('JSONの読み込みに失敗しました'); }
     e.target.value='';
   });
@@ -820,7 +852,6 @@
         <div>${p.pts} pt</div>`;
       wrap.appendChild(row);
 
-      // 編集系
       const editor=document.createElement('div'); editor.className='row small';
       const pr=person.profile||{age:null, ron:0, geneki:true, quota:0};
       editor.innerHTML=`
@@ -835,13 +866,12 @@
     });
     lastOrder = nowOrder;
 
-    // 変更イベント
     rankGrid.querySelectorAll('input.inp-mini, select.sel-mini').forEach(el=>{
       el.addEventListener('change',()=>{
         const name=el.dataset.name; const key=el.dataset.k; const person=people.find(p=>p.name===name); if(!person) return;
         if(key==='geneki'){ person.profile.geneki = (el.value==='1'); }
         else{ person.profile[key] = Number(el.value)||0; }
-        savePeople(); renderRank();
+        savePeople(); setLastUpdated(); renderRank();
       });
     });
 
@@ -869,7 +899,7 @@
   }
   setInterval(rankLiveTick, 30000);
 
-  // 応援フラグ
+  // 応援フラグ（ランクアップ者）
   const cheerers=new Set();
   function flagCheer(name, delta){ if(delta>=9) cheerers.add(name+'+9'); else if(delta>=7) cheerers.add(name+'+7'); else if(delta>=5) cheerers.add(name+'+5'); else if(delta>=3) cheerers.add(name+'+3'); else if(delta>=1) cheerers.add(name+'+1'); }
   function getCheerPrefixFor(name){
@@ -902,12 +932,12 @@
             <span class="linklike" data-act="down" style="margin-left:8px">↓</span>
             <span class="linklike" data-act="del" style="margin-left:8px">削除</span></div>`;
       const inputs=row.querySelectorAll('input');
-      inputs[0].addEventListener('input',()=>{ item.start=inputs[0].value; saveTT(subject,data); });
-      inputs[1].addEventListener('input',()=>{ item.end  =inputs[1].value; saveTT(subject,data); });
-      inputs[2].addEventListener('input',()=>{ item.title=inputs[2].value; saveTT(subject,data); });
-      row.querySelector('[data-act="del"]').addEventListener('click',()=>{ data.splice(idx,1); saveTT(subject,data); renderTimetable(); });
-      row.querySelector('[data-act="up"]').addEventListener('click',()=>{ if(idx>0){ const t=data[idx-1]; data[idx-1]=data[idx]; data[idx]=t; saveTT(subject,data); renderTimetable(); }});
-      row.querySelector('[data-act="down"]').addEventListener('click',()=>{ if(idx<data.length-1){ const t=data[idx+1]; data[idx+1]=data[idx]; data[idx]=t; saveTT(subject,data); renderTimetable(); }});
+      inputs[0].addEventListener('input',()=>{ item.start=inputs[0].value; saveTT(subject,data); setLastUpdated(); });
+      inputs[1].addEventListener('input',()=>{ item.end  =inputs[1].value; saveTT(subject,data); setLastUpdated(); });
+      inputs[2].addEventListener('input',()=>{ item.title=inputs[2].value; saveTT(subject,data); setLastUpdated(); });
+      row.querySelector('[data-act="del"]').addEventListener('click',()=>{ data.splice(idx,1); saveTT(subject,data); setLastUpdated(); renderTimetable(); });
+      row.querySelector('[data-act="up"]').addEventListener('click',()=>{ if(idx>0){ const t=data[idx-1]; data[idx-1]=data[idx]; data[idx]=t; saveTT(subject,data); setLastUpdated(); renderTimetable(); }});
+      row.querySelector('[data-act="down"]').addEventListener('click',()=>{ if(idx<data.length-1){ const t=data[idx+1]; data[idx+1]=data[idx]; data[idx]=t; saveTT(subject,data); setLastUpdated(); renderTimetable(); }});
       rowsEl.appendChild(row);
     });
   }
@@ -916,7 +946,7 @@
   $('#ttClose').addEventListener('click',()=> modal.classList.remove('show'));
   modal.addEventListener('click',(e)=>{ if(e.target===modal) modal.classList.remove('show'); });
 
-  $('#ttAddRow').addEventListener('click',()=>{ const data=loadTT(subject); data.push({start:'',end:'',title:''}); saveTT(subject,data); renderTimetable(); });
+  $('#ttAddRow').addEventListener('click',()=>{ const data=loadTT(subject); data.push({start:'',end:'',title:''}); saveTT(subject,data); setLastUpdated(); renderTimetable(); });
 
   // 20提案
   let suggestions=[]; let sugIndex=0;
@@ -942,17 +972,17 @@
   function previewSuggestion(){ const data=suggestions[sugIndex]||[]; const rowsEl=$('#ttRows'); rowsEl.innerHTML=''; data.forEach(item=>{ const row=document.createElement('div'); row.className='tt-row'; row.innerHTML=`<div>${item.start}</div><div>${item.end}</div><div>${escapeHtml(item.title)}</div><div class="muted">提案プレビュー</div>`; rowsEl.appendChild(row); }); $('#ttIndex').textContent=`${sugIndex+1} / ${suggestions.length}`; }
   $('#ttPrev').addEventListener('click',()=>{ if(sugIndex>0){ sugIndex--; previewSuggestion(); }});
   $('#ttNext').addEventListener('click',()=>{ if(suggestions && sugIndex<suggestions.length-1){ sugIndex++; previewSuggestion(); }});
-  $('#ttApply').addEventListener('click',()=>{ const data=suggestions[sugIndex]||[]; saveTT(subject,data); renderTimetable(); alert('提案を採用しました。必要ならここから編集できます。'); });
+  $('#ttApply').addEventListener('click',()=>{ const data=suggestions[sugIndex]||[]; saveTT(subject,data); setLastUpdated(); renderTimetable(); alert('提案を採用しました。必要ならここから編集できます。'); });
 
   /* ===== Events ===== */
   (function initName(){ const saved=localStorage.getItem(NAME_KEY); const me=saved||'橋本淑雅'; $('#displayName').value=me; $('#meOnBoard').textContent=me; })();
-  $('#saveName').addEventListener('click',()=>{ const me=(($('#displayName').value)||'橋本淑雅').trim(); localStorage.setItem(NAME_KEY,me); $('#meOnBoard').textContent=me; renderRank(); });
+  $('#saveName').addEventListener('click',()=>{ const me=(($('#displayName').value)||'橋本淑雅').trim(); localStorage.setItem(NAME_KEY,me); $('#meOnBoard').textContent=me; setLastUpdated(); renderRank(); });
 
   // Tabs
-  $('#tabProgress').addEventListener('click',()=>{ flushAutoSave(); showPage('progress'); setTimeout(scrollTodayIntoView,0); });
-  $('#tabClass').addEventListener('click',()=>{ flushAutoSave(); showPage('class'); });
-  $('#tabRank').addEventListener('click',()=>{ flushAutoSave(); showPage('rank'); });
-  $('#tabEdit').addEventListener('click',()=>{ flushAutoSave(); showPage('edit'); });
+  $('#tabProgress').addEventListener('click',()=>{ showPage('progress'); setTimeout(scrollTodayIntoView,0); });
+  $('#tabClass').addEventListener('click',()=>showPage('class'));
+  $('#tabRank').addEventListener('click',()=>showPage('rank'));
+  $('#tabEdit').addEventListener('click',()=>showPage('edit'));
   function setActiveTab(a,b,c,d){ $('#tabProgress').classList.toggle('active',a); $('#tabClass').classList.toggle('active',b); $('#tabRank').classList.toggle('active',c); $('#tabEdit').classList.toggle('active',d); }
   function showPage(which){
     const p1=$('#pageProgress'), p2=$('#pageClass'), p3=$('#pageRank'), p4=$('#pageEdit');
@@ -968,14 +998,7 @@
   $('#next').addEventListener('click',()=>{ pushHistory(); flushAutoSave(); month+=1; if(month>11){month=0;year+=1;} renderProgress(); renderRank(); });
 
   // 保存/読込
-  $('#save').addEventListener('click',()=>{
-    pushHistory();
-    flushAutoSave();              // まず確実に保存
-    renderProgress();             // ← ここを追加：テーブルが真っ白に見えないよう即再描画
-    renderRank();
-    alert('更新しました（この端末のブラウザ内）');
-    scrollTodayIntoView();
-  });
+  $('#save').addEventListener('click',()=>{ pushHistory(); flushAutoSave(); alert('更新しました（この端末のブラウザ内）'); renderProgress(); renderRank(); scrollTodayIntoView(); });
   $('#load').addEventListener('click',()=>{ const ok=load(); renderProgress(); renderRank(); alert(ok?'読み込みました':'保存データが見つかりません'); });
 
   // コンパクト
@@ -997,7 +1020,7 @@
   $('#importImg').addEventListener('change',async (e)=>{
     if(showAll){ alert('全科目では取込不可'); e.target.value=''; return; }
     const f=e.target.files?.[0]; if(!f) return;
-    try{ const text=await ocrImage(f); pushHistory(); const n=importAnyText(text)||parseTypeImport(text||''); renderProgress(); renderRank(); alert(n?`OCR取込で当月に ${n} 件反映しました`:'文字が認識できないか当月データが見つかりません'); }
+    try{ const text=await ocrImage(f); pushHistory(); const n=importAnyText(text)||parseTypeImport(text||''); renderProgress(); renderRank(); alert(n?`OCR取込で当月に ${n} 件反映しました`:'文字が認識できないか当月データが見つかりませんでした'); }
     catch(_){ alert('OCRに失敗しました'); }
     finally{ e.target.value=''; }
   });
@@ -1005,7 +1028,7 @@
   // Undo/Redo
   $('#undoP').onclick=$('#undoC').onclick=$('#undoT').onclick=$('#undoS').onclick=()=>{ undo(); setTimeout(scrollTodayIntoView,0); };
   $('#redoP').onclick=$('#redoC').onclick=$('#redoT').onclick=$('#redoS').onclick=()=>{ redo(); setTimeout(scrollTodayIntoView,0); };
-  $('#wipeP').onclick=()=>{ if(confirm((showAll?'全科目の今月行を初期化します。':'当月の進捗を初期化します。')+'\nよろしいですか？')){ pushHistory(); if(showAll){ subjects.forEach(sub=>{ const arr=loadSubjectMonth(sub); monthDates(year,month).forEach(ds=>{ const r=arr.find(x=>x.date===ds); if(r){ r.type='学習'; /* 入力は消さない */ r.color='normal'; } }); doSaveToLocal(sub,arr); }); } else { rows.forEach(r=>{ r.type='学習'; r.color='normal'; }); touch(); } renderProgress(); renderRank(); } };
+  $('#wipeP').onclick=()=>{ if(confirm((showAll?'全科目の今月行を初期化します。':'当月の進捗を初期化します。')+'\nよろしいですか？')){ pushHistory(); if(showAll){ subjects.forEach(sub=>{ const arr=loadSubjectMonth(sub); monthDates(year,month).forEach(ds=>{ const r=arr.find(x=>x.date===ds); if(r){ r.type='学習'; r.color='normal'; } }); doSaveToLocal(sub,arr); }); } else { rows.forEach(r=>{ r.type='学習'; r.color='normal'; }); touch(); } renderProgress(); renderRank(); } };
   $('#wipeC').onclick=()=>{ if(confirm('Cページの発話状態をリセットしますか？')){ lastSpokenAt.clear(); buildClassroom(); } };
   $('#wipeT').onclick=()=>{ if(confirm('ランキング表示を再計算しますか？')){ renderRank(); } };
 
@@ -1023,21 +1046,21 @@
 
   // 全科目ボタン
   function highlightAllToggle(){ $('#allIcon').textContent = showAll? '📖':'📚'; $('#toggleAllBtn').classList.toggle('active', showAll); }
-  $('#toggleAllBtn').addEventListener('click',()=>{ pushHistory(); flushAutoSave(); showAll=!showAll; renderProgress(); highlightAllToggle(); });
+  $('#toggleAllBtn').addEventListener('click',()=>{ pushHistory(); showAll=!showAll; renderProgress(); highlightAllToggle(); });
 
   // 科目/色
   const PRESETS={ redsox:{hex:'#BD3039',tint:20}, bluejays:{hex:'#134A8E',tint:20}, dodgers:{hex:'#005A9C',tint:18}, nl:{hex:'#13274F',tint:18} };
   document.querySelectorAll('.preset').forEach(btn=> btn.addEventListener('click',()=>{ const p=PRESETS[btn.dataset.preset]; $('#colorPicker').value=p.hex; $('#tintRange').value=p.tint; }));
-  $('#applyColor').addEventListener('click',()=>{ const hex=(($('#colorPicker').value)||'').trim(); const tint=+$('#tintRange').value||20; if(!/^#?[0-9a-fA-F]{6}$/.test(hex)){ alert('HEXカラーを #RRGGBB で入力'); return; } const hx=hex.startsWith('#')?hex:('#'+hex); subjectColors[subject]={hex:hx,tint:Math.max(0,Math.min(95,tint))}; saveSubjectColors(); renderProgress(); });
-  $('#applyDoneColor').addEventListener('click',()=>{ const hex=(($('#doneColorPicker').value)||'').trim()||doneColor.hex; const tint=+$('#doneTintRange').value||doneColor.tint; if(!/^#?[0-9a-fA-F]{6}$/.test(hex)){ alert('HEXカラーを #RRGGBB で入力'); return; } doneColor={hex:hex.startsWith('#')?hex:('#'+hex), tint:Math.max(10,Math.min(95,tint))}; saveDoneColor(); renderProgress(); });
+  $('#applyColor').addEventListener('click',()=>{ const hex=(($('#colorPicker').value)||'').trim(); const tint=+$('#tintRange').value||20; if(!/^#?[0-9a-fA-F]{6}$/.test(hex)){ alert('HEXカラーを #RRGGBB で入力'); return; } const hx=hex.startsWith('#')?hex:('#'+hex); subjectColors[subject]={hex:hx,tint:Math.max(0,Math.min(95,tint))}; saveSubjectColors(); setLastUpdated(); renderProgress(); });
+  $('#applyDoneColor').addEventListener('click',()=>{ const hex=(($('#doneColorPicker').value)||'').trim()||doneColor.hex; const tint=+$('#doneTintRange').value||doneColor.tint; if(!/^#?[0-9a-fA-F]{6}$/.test(hex)){ alert('HEXカラーを #RRGGBB で入力'); return; } doneColor={hex:hex.startsWith('#')?hex:('#'+hex), tint:Math.max(10,Math.min(95,tint))}; saveDoneColor(); setLastUpdated(); renderProgress(); });
 
   // ポイント設定
   function updateRuleNumbers(){ $('#ruleStudy').textContent=pointsCfg.study; $('#ruleReview').textContent=pointsCfg.review; $('#ruleHoliday').textContent=pointsCfg.holiday; }
-  $('#applyPts').addEventListener('click',()=>{ pointsCfg={ study:+$('#ptStudy').value||0, review:+$('#ptReview').value||0, holiday:+$('#ptHoliday').value||0 }; savePoints(); updateRuleNumbers(); renderRank(); });
+  $('#applyPts').addEventListener('click',()=>{ pointsCfg={ study:+$('#ptStudy').value||0, review:+$('#ptReview').value||0, holiday:+$('#ptHoliday').value||0 }; savePoints(); setLastUpdated(); updateRuleNumbers(); renderRank(); });
 
   // 科目選択
-  $('#addSubject').addEventListener('click',()=>{ const name=prompt('追加する科目名（例：英語）'); if(!name) return; const trimmed=name.trim(); if(!trimmed) return; if(subjects.includes(trimmed)){ alert('その科目はすでにあります'); return; } subjects.push(trimmed); saveSubjects(); renderSubjectSelect(); subject=trimmed; showAll=false; renderProgress(); });
-  $('#subjectSelect').addEventListener('change',e=>{ pushHistory(); flushAutoSave(); subject=e.target.value; showAll=false; renderProgress(); });
+  $('#addSubject').addEventListener('click',()=>{ const name=prompt('追加する科目名（例：英語）'); if(!name) return; const trimmed=name.trim(); if(!trimmed) return; if(subjects.includes(trimmed)){ alert('その科目はすでにあります'); return; } subjects.push(trimmed); saveSubjects(); setLastUpdated(); renderSubjectSelect(); subject=trimmed; showAll=false; renderProgress(); });
+  $('#subjectSelect').addEventListener('change',e=>{ pushHistory(); subject=e.target.value; showAll=false; renderProgress(); });
 
   /* ===== Init ===== */
   function renderAll(){
@@ -1053,6 +1076,7 @@
     const theme=colorFor(subject); $('#colorPicker').value=theme.hex; $('#tintRange').value=theme.tint;
     $('#doneColorPicker').value=doneColor.hex; $('#doneTintRange').value=doneColor.tint;
     $('#ptStudy').value=pointsCfg.study; $('#ptReview').value=pointsCfg.review; $('#ptHoliday').value=pointsCfg.holiday;
+    updateLastUpdatedLabel(); // 初期表示
   }
   (function init(){ load(); renderAll(); document.body.classList.add('compact'); setTimeout(scrollTodayIntoView,0); })();
 
