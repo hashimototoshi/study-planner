@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Study Planner – v17.13</title>
+<title>Study Planner – v17.12</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 <style>
   :root{
@@ -108,6 +108,7 @@
 
   .rank-sidebar{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff;max-height:78vh;overflow:auto}
   .rank-sidebar h4{margin:0 0 8px}
+  .rank-list{counter-reset:rk}
   .rank-list li{display:flex;justify-content:space-between;gap:8px;padding:6px 4px;border-bottom:1px dashed #e5e7eb}
   .rank-list li:last-child{border-bottom:none}
 
@@ -123,12 +124,12 @@
   .tt-grid{display:grid;grid-template-columns:110px 1fr 1fr 1fr; gap:8px; align-items:center}
   .tt-grid > div,.tt-row>div{padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:#fff}
   .tt-row{display:contents}
-  .linklike{color:#2563eb;text-decoration:underline;cursor:pointer}
+  .linklike{color:var(--accent);text-decoration:underline;cursor:pointer}
 </style>
 </head>
 <body>
   <h1>
-    学習計画（1ヶ月表示）<span class="muted" id="verTag">v17.13</span>
+    学習計画（1ヶ月表示）<span class="muted" id="verTag">v17.12</span>
     <span class="muted" id="savedAt">最終保存: -</span>
     <button id="reloadBtn" class="pill" title="強制リロード">R</button>
   </h1>
@@ -152,7 +153,7 @@
       <button id="undoP">戻る</button>
       <button id="redoP">進む</button>
       <button id="wipeP">全削除</button>
-      <!-- 取込系 -->
+      <!-- 取込系をここに新設 -->
       <button id="btnPasteImport" class="chip">📋 貼り付け取込</button>
       <label class="chip">
         📁 ファイル取込
@@ -170,6 +171,7 @@
         <button id="toggleAllBtn" class="chip" title="全科目（一覧）"><span id="allIcon">📚</span> 全科目</button>
       </div>
 
+      <!-- テーマ色 -->
       <div class="row">
         <span class="muted">🎨 テーマ色</span>
         <button class="chip preset" data-preset="redsox">Red Sox</button>
@@ -182,6 +184,7 @@
         <button id="applyColor" class="chip">適用</button>
       </div>
 
+      <!-- 完了色 -->
       <div class="row">
         <span class="muted">✅ 完了色</span>
         <input id="doneColorPicker" type="text" placeholder="#B0A89F" style="width:9em">
@@ -190,6 +193,7 @@
         <button id="applyDoneColor" class="chip">適用</button>
       </div>
 
+      <!-- ポイント設定 -->
       <div class="row">
         <span class="muted">🏅ポイント</span>
         <span class="inl small">学習 <input id="ptStudy" class="inp-mini" type="number" min="0" value="10"></span>
@@ -198,6 +202,7 @@
         <button id="applyPts" class="chip">保存</button>
       </div>
 
+      <!-- 時間割 -->
       <div class="row" style="margin-left:auto">
         <button id="ttOpen" class="chip">🗓 時間割を開く</button>
       </div>
@@ -329,7 +334,7 @@
 <script>
 (function(){
   'use strict';
-  const VER='v17.13';
+  const VER='v17.12';
 
   /* ===== Keys ===== */
   const NS='studyplanner.v17'; // 既存データと互換
@@ -399,31 +404,15 @@
   /* ===== Per-month data ===== */
   const currentKey = (s=subject)=> `${DATA_KEY}:${s}:${year}-${String(month+1).padStart(2,'0')}`;
   function ensureScaffoldFor(arr){
-    const result = Array.isArray(arr) ? arr : [];
     const need=new Set(monthDates(year,month));
-    const have=new Set(result.map(r=>r.date));
-    need.forEach(d=>{ if(!have.has(d)) result.push({date:d, type:'学習', goal:'', result:'', review:'', color:'normal'}); });
-    result.sort((a,b)=>a.date.localeCompare(b.date));
-    return result;
+    const have=new Set(arr.map(r=>r.date));
+    need.forEach(d=>{ if(!have.has(d)) arr.push({date:d, type:'学習', goal:'', result:'', review:'', color:'normal'}); });
+    arr.sort((a,b)=>a.date.localeCompare(b.date));
   }
-  function loadSubjectMonth(s=subject){
-    try{
-      const raw=localStorage.getItem(currentKey(s));
-      const arr = raw? JSON.parse(raw): [];
-      return ensureScaffoldFor(arr);
-    }catch(_){
-      return ensureScaffoldFor([]);
-    }
-  }
-  function doSaveToLocal(s=subject, dataRows=rows){
-    const data=(dataRows||[]).filter(r=>{ const d=fromYmd(r.date); return d.getMonth()===month && d.getFullYear()===year; });
-    try{ localStorage.setItem(currentKey(s), JSON.stringify(data)); }catch(_){}
-  }
+  function loadSubjectMonth(s=subject){ const raw=localStorage.getItem(currentKey(s)); let arr=[]; if(raw){ try{ arr=JSON.parse(raw)||[]; }catch(_){ } } ensureScaffoldFor(arr); return arr; }
+  function doSaveToLocal(s=subject, dataRows=rows){ const data=dataRows.filter(r=>{ const d=fromYmd(r.date); return d.getMonth()===month && d.getFullYear()===year; }); try{ localStorage.setItem(currentKey(s), JSON.stringify(data)); }catch(_){} }
   function stripSubject(r){ const { _subject, ...rest } = r; return rest; }
-  function persist(rec){
-    const i=rows.findIndex(x=>x.date===rec.date && (showAll? (x._subject===rec._subject):true));
-    if(i>=0) rows[i]=rec; else rows.push(rec);
-  }
+  function persist(rec){ const i=rows.findIndex(x=>x.date===rec.date && (showAll? (x._subject===rec._subject):true)); if(i>=0) rows[i]=rec; else rows.push(rec); }
 
   function reloadRows(){
     if(showAll){
@@ -492,14 +481,14 @@
       female: FEMALES.has(n),
       famous: FAMOUS.has(n),
       profile:{age:18+i%5, ron:i%3, geneki:(i%4!==0), quota: 60 + (i*7)%41},
-      traits:{tokui: tokuiList[i%tokuiList.length], nigate: nigateList[(i+3)%nigateList.length], seikaku: seikakuList[(i+5)%seikakuList.length]}
+      traits:{tokui: tokuiList[i%tokuiList.length], nigate: nigateList[(i+3)%nigateList.length], seikaku: seikakuList[(i+5)%nigateList.length]}
     }));
   }
   function loadPeople(){ try{ const raw=localStorage.getItem(PEOPLE_KEY); return raw? JSON.parse(raw): defaultPeople(); }catch(_){ return defaultPeople(); } }
   function savePeople(){ try{ localStorage.setItem(PEOPLE_KEY, JSON.stringify(people)); }catch(_){} }
   let people = loadPeople();
 
-  // 20個の個性的な初期セリフ
+  // 20個の個性的な初期セリフ（人物ごとに内容を変化）＋表示名の人を重点的に
   function makeDefaultLinesFor(p){
     const n=p.name, t=p.traits||{}, pr=p.profile||{};
     const pieces=[
@@ -543,9 +532,6 @@
 
   /* ===== Page1: Render ===== */
   function renderProgress(){
-    // スクロール位置保持
-    const scroller=$('#scroller'); const prevTop = scroller? scroller.scrollTop : 0;
-
     const days = monthDates(year,month).length;
     const label=$('#label'); if(label) label.textContent = showAll? `全科目 ${year}年${month+1}月（${days}日）` : `${subject} — ${year}年${month+1}月（${days}日）`;
 
@@ -620,7 +606,7 @@
         btn.addEventListener('click',()=>{
           const v=btn.dataset.val;
           r.type=v;
-          if(v==='学習') r.color='normal'; // 学習に戻したら科目色へ
+          if(v==='学習') r.color='normal';
           persist(r); scheduleSave(); renderProgress();
         });
       });
@@ -633,7 +619,7 @@
         popAt(ev.target, `${wasDone?'−':'+'}${pointsForType(r.type||'学習')}`, wasDone?'#ef4444':'#10b981');
       });
 
-      // キー移動
+      // 矢印キー移動
       const focusables=[inGoal,inRes,inRev,btnDone];
       focusables.forEach((el,colIndex)=>{
         el.dataset.rowIndex=rowIndex; el.dataset.colIndex=colIndex;
@@ -660,9 +646,6 @@
 
     const t=new Date();
     const todayBanner=$('#todayBanner'); if(todayBanner) todayBanner.textContent=`本日: ${t.getMonth()+1}月${t.getDate()}日(${jpWeek(t)})`;
-
-    // スクロール位置復元
-    if(scroller) scroller.scrollTop = prevTop;
   }
 
   function popAt(anchor, text, color){
@@ -806,12 +789,12 @@
     }
   }
 
-  // Google Sheets 取込（公開シートのCSV）
+  // Google Sheets 取込（公開シートのCSVに対応）
   async function importFromSheets(urlOrId){
     try{
       let url=String(urlOrId||'').trim();
       if(!url) return 0;
-      if(/^[-\w]{20,}$/.test(url)){ // IDだけ
+      if(/^[-\w]{20,}$/.test(url)){ // IDだけ渡された場合
         url=`https://docs.google.com/spreadsheets/d/${url}/export?format=csv`;
       }
       const gidMatch=url.match(/[?&]gid=(\d+)/);
@@ -832,7 +815,7 @@
 
   /* ===== Points aggregation / Ranking ===== */
   function myMonthlyPoints(){
-    const base = loadSubjectMonth(subject); // 自分は選択科目の月合計
+    const base = (!showAll) ? rows : loadSubjectMonth(subject);
     let total=0;
     monthDates(year,month).forEach(date=>{
       const r=base.find(x=>x.date===date); if(!r) return;
@@ -917,7 +900,7 @@
     const ticker=$('#rankTicker');
     if(hour>=18){ if(ticker) ticker.textContent='本日のライブ加点は終了（以降は翌日に反映）'; return; }
     const pool = people.filter(p=>p.name!==($('#displayName').value||'橋本淑雅'));
-    const nChanges= Math.max(1, Math.round(4*rankSpeedPct/100)); // 速度に比例
+    const nChanges= Math.max(1, Math.round(4*rankSpeedPct/100)); // 速度に比例して変更回数UP
     for(let i=0;i<nChanges;i++){
       const w=pool.map(x=> (x.profile.quota||0)+10); const sum=w.reduce((a,b)=>a+b,0)||1;
       let r=Math.random()*sum, pick=pool[0];
@@ -1111,7 +1094,6 @@
   $('#ttOpen')?.addEventListener('click',()=>{ modal.classList.add('show'); renderTimetable(); });
   $('#ttClose')?.addEventListener('click',()=> modal.classList.remove('show'));
   modal?.addEventListener('click',(e)=>{ if(e.target===modal) modal.classList.remove('show'); });
-  $('#ttAddRow')?.addEventListener('click',()=>{ const data=loadTT(subject); data.push({start:'',end:'',title:''}); saveTT(subject,data); renderTimetable(); });
 
   // 20提案
   let suggestions=[]; let sugIndex=0;
@@ -1190,7 +1172,7 @@
     const show=(a,b)=>{ a.style.display='block'; b.forEach(x=>x.style.display='none'); };
     if(which==='progress'){ show(p1,[p2,p3,p4]); setActiveTab(true,false,false,false); stopClassTicker(); renderProgress(); }
     if(which==='class'){ show(p2,[p1,p3,p4]); setActiveTab(false,true,false,false); buildClassroom(); restartClassTicker(); }
-    if(which==='rank'){ show(p3,[p1,p2,p4]); setActiveTab(false,false,true,false); stopClassTicker(); renderRank(); startRankTimer(); }
+    if(which==='rank'){ show(p3,[p1,p2,p4]); setActiveTab(false,false,true,false); stopClassTicker(); renderRank(); }
     if(which==='edit'){ show(p4,[p1,p2,p3]); setActiveTab(false,false,false,true); stopClassTicker(); renderEditPage(); }
   }
 
@@ -1246,7 +1228,7 @@
   $('#fabHome')?.addEventListener('click',()=>{ showPage('progress'); setTimeout(scrollTodayIntoView,0); });
 
   // R＝強制リロード（キャッシュバイパス）
-  $('#reloadBtn')?.addEventListener('click',()=>{ const url = location.pathname + '?r=' + Date.now() + '&v=' + VER; location.replace(url); });
+  $('#reloadBtn')?.addEventListener('click',()=>{ const url = location.pathname + '?r=' + Date.now() + '&v=17.12'; location.replace(url); });
 
   // Boost（2ページ）
   (function initBoost(){
@@ -1274,11 +1256,6 @@
 
   // ランク速度
   $('#rankSpeed')?.addEventListener('change',()=>{ const v=Number($('#rankSpeed').value)||100; rankSpeedPct=Math.max(10,Math.min(300,v)); startRankTimer(); });
-
-  // 席替え/レイアウト
-  let randomLayout=false;
-  $('#shuffleSeat')?.addEventListener('click',()=>{ randomLayout=true; layoutMode='RANDOM'; buildClassroom(); });
-  $('#toggleLayout')?.addEventListener('click',()=>{ layoutMode = (layoutMode==='MFM'?'RANDOM':'MFM'); buildClassroom(); });
 
   // 科目選択
   $('#addSubject')?.addEventListener('click',()=>{ const name=prompt('追加する科目名（例：英語）'); if(!name) return; const trimmed=name.trim(); if(!trimmed) return; if(subjects.includes(trimmed)){ alert('その科目はすでにあります'); return; } subjects.push(trimmed); saveSubjects(); renderSubjectSelect(); subject=trimmed; showAll=false; reloadRows(); renderProgress(); });
